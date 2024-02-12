@@ -1,3 +1,2 @@
-Repo Name (❌FIXME) – Simulations
-==================================
-
+iCub HeadEdge
+=============
