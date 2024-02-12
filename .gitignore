@@ -1,7 +1,9 @@
 *~
 ~*
-build/
+build*
 *.slxc
 *.autosave
+*.bak
 slprj*
-sessions*
+cache*
+codegen*
