@@ -26,5 +26,7 @@
 *.pdf binary
 *.png binary
 *.xlsx binary
-## LFS
+
+## Mesh files
+*.stp filter=lfs diff=lfs merge=lfs -text
 *.step filter=lfs diff=lfs merge=lfs -text
