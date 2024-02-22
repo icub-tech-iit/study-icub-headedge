@@ -1,3 +1,6 @@
+% Copyright (C) 2024 Fondazione Istitito Italiano di Tecnologia (IIT)
+% All Rights Reserved.
+
 % Close all open models discarding changes
 bdclose('all');
 
