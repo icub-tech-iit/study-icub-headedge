@@ -4,6 +4,7 @@
 classdef Types_Payload < Simulink.IntEnumType
     enumeration
         ergoCubHead(0)
+        iCubHead(1)
     end
     methods (Static = true)
         function retVal = addClassNameToEnumNames()
