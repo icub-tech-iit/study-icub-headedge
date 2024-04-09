@@ -37,6 +37,7 @@ After rebooting into the graphical OS, run the following commands in a terminal 
 ```bash
 sudo apt install -f
 sudo apt update && sudo apt upgrade
+reboot
 ``` 
 
 ### Switch profile on Orin NX
