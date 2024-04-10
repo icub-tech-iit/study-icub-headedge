@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE robot PUBLIC "-//YARP//DTD yarprobotinterface 3.0//EN" "http://www.yarp.it/DTD/yarprobotinterfaceV3.0.dtd">
+
+<robot name="head_setup" build="2" portprefix="/icub" xmlns:xi="http://www.w3.org/2001/XInclude">
+
+    <params>
+        <xi:include href="hardware/electronics/pc104.xml" />
+    </params>
+
+    <devices>
+        <xi:include href="calibrators/head-calib.xml" />
+        <xi:include href="hardware/mechanicals/head-eb1-j0_1-mec.xml" />
+        <xi:include href="hardware/motorControl/head-eb1-j0_1-mc.xml" />
+        <xi:include href="wrapper/motorControl/head-mc_wrapper.xml" />
+        <xi:include href="wrapper/motorControl/head-mc_remapper.xml" />
+    </devices>
+</robot>
