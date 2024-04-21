@@ -4,6 +4,7 @@
 classdef Types_Sensing < Simulink.IntEnumType
     enumeration
         Ideal(0)
+        Mk3_Serial(1)
     end
     methods (Static = true)
         function retVal = addClassNameToEnumNames()
