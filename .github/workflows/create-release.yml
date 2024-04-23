@@ -1,0 +1,101 @@
+name: Create Release
+
+on: 
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Release Name'
+        required: true
+        default: 'Project iCub HeadEdge v0.0.0'
+      body:
+        description: 'Release Body Message'
+        required: true
+        default: 'The asset provided by this release contains the whole material stored in the repository.'
+      tag:
+        description: 'Release Tag'
+        required: true
+        default: 'v0.0.0'
+      zip_size:
+        description: 'Max size of zip files in GB'
+        required: true
+        default: '1'
+
+env:
+  DIR_PREFIX: icub-headedge
+
+jobs:
+  doRelease:
+    name: "Release"
+    runs-on: ubuntu-latest
+    environment: release_environment
+
+    steps:
+      - name: Release Inputs
+        run: |
+          echo "Release Inputs:"
+          echo "- Name: ${{ inputs.name }}" 
+          echo "- Body: ${{ inputs.body }}" 
+          echo "- Tag: ${{ inputs.tag }}" 
+          echo "- Zip Size: ${{ inputs.zip_size }}g"
+
+      - name: Clone Branch master
+        uses: actions/checkout@main
+        with:
+          ref: master
+          path: ${{ env.DIR_PREFIX }}-${{ inputs.tag }}/master
+          lfs: true
+
+      - name: Clone Branch mech
+        uses: actions/checkout@main
+        with:
+          ref: mech
+          path: ${{ env.DIR_PREFIX }}-${{ inputs.tag }}/mech
+          lfs: true
+
+      - name: Clone Branch sim
+        uses: actions/checkout@main
+        with:
+          ref: sim
+          path: ${{ env.DIR_PREFIX }}-${{ inputs.tag }}/sim
+          lfs: true
+
+      - name: Clone Branch code
+        uses: actions/checkout@main
+        with:
+          ref: code
+          path: ${{ env.DIR_PREFIX }}-${{ inputs.tag }}/code
+          lfs: true
+
+      - name: Configure Git
+        run: |
+          git config --global push.default upstream
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Tag Branches
+        run: |
+          declare -a branches=("master" "mech" "sim" "code")
+          for branch in ${branches[@]}; do
+            echo "tagging ${branch}..."
+            cd ${GITHUB_WORKSPACE}/${DIR_PREFIX}-${{ inputs.tag }}/${branch}
+            git tag -a ${branch}-${{ inputs.tag }} -m "version ${{ inputs.tag }}"
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+            git push origin --tags
+            rm -Rf .git
+          done
+
+      - name: Create Assets
+        run: |
+          zip -r -s ${{ inputs.zip_size }}g ${DIR_PREFIX}-${{ inputs.tag }}.zip ${DIR_PREFIX}-${{ inputs.tag }}/
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: master-${{ inputs.tag }}
+          name: ${{ inputs.name}}
+          body: ${{ inputs.body }}
+          generate_release_notes: false
+          make_latest: true
+          files: |
+            ${{ env.DIR_PREFIX }}-${{ inputs.tag }}.*
+
