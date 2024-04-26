@@ -24,18 +24,20 @@ The setup consists of an old iCub head that was renewed to be usable with the ne
 
 <p align="middle">
   <img src="assets/orin-nx.png" width="250" />
-  <img src="assets/camera-front.png" width="250" /> 
+  <img src="assets/camera-front.jpeg" width="250" /> 
 </p>
 
 To control the eyes' motors (`tilt` and `pan`), instead, an `MC4PLUS` was mounted on the top of the head:
 
-![mc4plus](assets/mc4plus.png)
+![mc4plus](assets/mc4plus.jpeg)
 
 The configuration files used to run the tests with this setup can be found [here](https://github.com/icub-tech-iit/study-icub-headedge/tree/code/head_setup).
 
 ## 2. Tests
 
 In order to check the strength of the flat cable, different tests were conducted under different conditions. They will be illustrated in the following paragraphs. During the entire testing phase, the `argus_camera` software was kept open to continuously stream the images from the camera and check if the wiring remains plugged-in.
+
+![argus-camera](assets/argus_camera.jpeg)
 
 The tests have in common that the joints were tested one after another (usually, first `eyes_tilt`, then `eyes_pan`), sweeping throught defined velocities, awating a proper number of cycles from one another. The joints are in `position control`, so a minimum-jerk profile from the start to the end position is observed:
 
