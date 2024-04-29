@@ -1,9 +1,9 @@
 % Copyright (C) 2022 Fondazione Istitito Italiano di Tecnologia (IIT)
 % All Rights Reserved.
 
-classdef Types_Sensing < Simulink.IntEnumType
+classdef Types_Impairments < Simulink.IntEnumType
     enumeration
-        Mk2(0)
+        Ideal(0)
         Mk3_Serial(1)
     end
     methods (Static = true)
