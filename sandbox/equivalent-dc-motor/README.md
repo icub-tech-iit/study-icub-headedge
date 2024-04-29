@@ -1,7 +1,7 @@
 Equivalent DC model of a PMSM motor
 ===================================
 
-Considering a PMSM motor controlled via FOC (i.e., the direct current can be neglected), the equivalence with a corresponding DC motor can be enforced by imposing the following relations:
+Considering a wye-wound PMSM motor controlled via FOC (i.e., the direct current can be neglected), the equivalence with a corresponding DC motor can be enforced by imposing the following relations:
 - The armature resistance of the DC model is equal to $`2 \cdot R_s`$, with $`R_s`$ the stator resistance per phase.
 - The armature inductance of the DC model is equal to $`2 \cdot L_q`$ with $`L_q`$ the stator q-axis inductance.
 - $`K_t^{DC} = \frac{3}{2} \cdot K_t^{PMSM}`$, where $`K_t`$ is the torque constant.
