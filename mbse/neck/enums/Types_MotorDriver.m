@@ -5,7 +5,7 @@ classdef Types_MotorDriver < Simulink.IntEnumType
     enumeration
         DC_Ideal_12V(0)
         DC_PWM_12V(1)
-        DC_Ideal_48V(2)
+        DC_Ideal_24V(2)
     end
     methods (Static = true)
         function retVal = addClassNameToEnumNames()
