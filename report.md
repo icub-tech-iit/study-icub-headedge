@@ -1,17 +1,19 @@
-FRAMOS IMX415C - Flat cable strength
+FRAMOS IMX415C
 ====================
 
-The following report describes the design of the experiments that were run to mechanically test the new cameras [`FRAMOS-IMX415C`](https://www.framos.com/en/products/fsm-imx415-sensor-module-26361).
+The following report describes the design of the experiments that were run to test the new cameras [`FRAMOS-IMX415C`](https://www.framos.com/en/products/fsm-imx415-sensor-module-26361).
 
-The aim of these tests was to test whether the flat cable of the new camera holds on during repeated stress movements over time.
+The mechanical experiments were done with the aim of testing whether the flat cable of the new camera holds on during repeated stress movements over time. Moreover, a `glass-to-glass` test was done to measure the latency of the cameras.
 
-- [FRAMOS IMX415C - Flat cable strength](#framos-imx415c---flat-cable-strength)
+- [FRAMOS IMX415C](#framos-imx415c)
   - [1. Setup description](#1-setup-description)
   - [2. Tests](#2-tests)
-    - [2.1 Test 1 - Constant velocity](#21-test-1---constant-velocity)
-    - [2.2 Test 2 - Increasing velocity](#22-test-2---increasing-velocity)
-    - [2.3 Test 3 - Mixed velocity pattern](#23-test-3---mixed-velocity-pattern)
-    - [2.4 Test 4 - Mixed faster velocity pattern](#24-test-4---mixed-faster-velocity-pattern)
+    - [2.1 Mechanical test](#21-mechanical-test)
+      - [2.1.1 Test 1 - Constant velocity](#211-test-1---constant-velocity)
+      - [2.1.2 Test 2 - Increasing velocity](#212-test-2---increasing-velocity)
+      - [2.1.3 Test 3 - Mixed velocity pattern](#213-test-3---mixed-velocity-pattern)
+      - [2.1.4 Test 4 - Mixed faster velocity pattern](#214-test-4---mixed-faster-velocity-pattern)
+    - [2.2 Glass-to-glass latency](#22-glass-to-glass-latency)
   - [3. Results](#3-results)
     - [3.1 Result - test 1](#31-result---test-1)
     - [3.2 Result - test 2](#32-result---test-2)
@@ -35,6 +37,8 @@ The configuration files used to run the tests with this setup can be found [here
 
 ## 2. Tests
 
+### 2.1 Mechanical test
+
 In order to check the strength of the flat cable, different tests were conducted under different conditions. They will be illustrated in the following paragraphs. During the entire testing phase, the `argus_camera` software was kept open to continuously stream the images from the camera and check if the wiring remains plugged-in.
 
 ![argus-camera](assets/argus_camera.jpeg)
@@ -49,27 +53,42 @@ $$
 
 For the sake of completeness, called `max` the upper mechanical limit of the joint, `min` the lower one, and `range` the difference between the maximum and the minimum, a cycle is defined as the movement that a joint performs from its zero position, going to `max - 0.1 * range`, to end up in `min + 0.1 * range`. This reasonable margin is taken into account to ensure the joint not to be damaged.
 
-### 2.1 Test 1 - Constant velocity
+#### 2.1.1 Test 1 - Constant velocity
 
 The first test consisted in applying a constant reference velocity of `500 deg/s` for `500 cycles` per joint.
 
-### 2.2 Test 2 - Increasing velocity
+#### 2.1.2 Test 2 - Increasing velocity
 
 To stress the flat cable on the camera side, the second testing condition consisted in repeating the movement for `250 cycles`, but with an increasing velocity for each bunch of repetitions. The swept velocities were `[25, 50, 200, 500] deg/s`.
 
-### 2.3 Test 3 - Mixed velocity pattern
+#### 2.1.3 Test 3 - Mixed velocity pattern
 
 This test is quite similar to the one described in the previous section, except for the velocities that, here, varied in a non-linear pattern. The sequence used in this case was `[200.0, 50.0, 100.0, 25.0, 500.0] deg/s` and, for each value, `250 cycles` were reproduced.
 
-### 2.4 Test 4 - Mixed faster velocity pattern
+#### 2.1.4 Test 4 - Mixed faster velocity pattern
 
 The aim of the latest test was to give the maximum stress as possible to the flat cable. For this reason, the rationale behind this experiment was to move the joints more frequently, alternating between lower and higher velocity in a mixed pattern. The number of repetitions was lowered to `25 cycles` and the swept velocities were `[200.0, 50.0, 100.0, 25.0, 500.0, 150.0, 40.0, 300.0, 125.0]`.
+
+### 2.2 Glass-to-glass latency
+
+The `glass-to-glass` is a test usually done to measure the amount of time a system needs to process the images and display them. 
+
+This test was conducted using the `argus_camera` visualizer. A stopwatch from the Orin NX was put in front of the cameras and the screen was captured while the stopwatch was rendered on the screen. The experiment was done on one camera at time, and then on both of them together.
+
+|  | `test` | `latency` |
+|:--------:|:--------:| :--------:|
+| `left camera` | ![left](assets/left_camera.jpg) | ~9 ms |
+| `right camera` | ![right](assets/right_camera.jpg)| ~9 ms |
+| `two cameras` | ![both](assets/two_cameras.jpg)| ~9 ms |
+
+These tests were performed using images with a resolution of `1920x1080@12bpp` and a frame rate of `90 fps`.
 
 ## 3. Results
 
 In the following paragraphs, the results of each individual test are reported in terms of position setpoints with the correspondent feedback measurements, and minjerk velocity.
 
 The minimum-jerk peak velocity $v_{mj}^{max}$ that it will be shown in the following plots is related to the average velocity $\bar{v}$ with the following relations:
+
 $$
 \begin{split}
 \bar{v} &= \frac{x_d-x_0}{T} \\
