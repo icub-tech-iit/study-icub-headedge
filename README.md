@@ -69,7 +69,7 @@ As soon as the installation procedure has finished, please power off the Orin NX
 > [!Warning]  
 > During the flashing procedure, the profile `fsm-imx415-2cam` has been selected, which means that two cameras could be used with this configuration. For this reason, only CAM1 and CAM2 connectors are enabled to read the data from the FRAMOS-IMX415, while CAM3 and CAM4 are not. Please, be sure that they are properly connected.
 
-Check if the cameras are detected with `ls /dev/video*`. If yes, your setup is ready. Go into `opt/framos/libsv/argus` and then run:
+Check if the cameras are detected with `ls /dev/video*`. If yes, your setup is ready. Go into `/opt/framos/libsv/argus` and then run:
 
 ```
 ./argus_camera
