@@ -101,11 +101,16 @@ bool argusCameraDriver::stopCamera()
 bool argusCameraDriver::open(Searchable& config)
 {
     bool ok{true};
-    yCTrace(ARGUS_CAMERA) << "input params are " << config.toString();
+    yCDebug(ARGUS_CAMERA) << "input params are " << config.toString();
 
     // FIXME parse generator part
 
-    if (m_rotationWithCrop)
+    if(!parseParams(config)) {
+        yCError(ARGUS_CAMERA) << "Error parsing parameters";
+        return false;
+    }
+
+    if (m_rotation_with_crop)
     {
         if (m_rotation == -90.0 || m_rotation == 90.0)
         {
