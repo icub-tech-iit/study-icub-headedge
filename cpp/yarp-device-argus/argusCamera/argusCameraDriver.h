@@ -10,6 +10,10 @@
 #define ARGUS_DRIVER_H
 
 // FIXME argus includes
+#include <Argus/Argus.h>
+
+#include "argusCameraDriver_ParamsParser.h"
+
 #include <yarp/dev/DeviceDriver.h>
 #include <yarp/dev/IFrameGrabberControls.h>
 #include <yarp/dev/IFrameGrabberImage.h>
@@ -35,7 +39,8 @@ YARP_LOG_COMPONENT(ARGUS_CAMERA, "yarp.device.argusCamera")
 class argusCameraDriver : public yarp::dev::DeviceDriver,
                           public yarp::dev::IFrameGrabberControls,
                           public yarp::dev::IFrameGrabberImage,
-                          public yarp::dev::IRgbVisualParams
+                          public yarp::dev::IRgbVisualParams,
+                          public argusCameraDriver_ParamsParser
 {
    public:
     argusCameraDriver() = default;
@@ -175,10 +180,7 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     bool m_verbose{false};
     bool m_initialized{false};
     float m_fps{30.0};
-    double m_rotation{0.0};  // degrees
-    uint32_t m_width{640};
-    uint32_t m_height{480};
+
     // FIXME argus camera pointer
-    bool m_rotationWithCrop{false};
 };
 #endif  // ARGUS_DRIVER_H

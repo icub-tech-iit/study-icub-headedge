@@ -1,7 +1,12 @@
 
 ![YARP logo](https://raw.githubusercontent.com/robotology/yarp/master/doc/images/yarp-robot-24.png "yarp-device-argus")
 yarp-device-argus
-=================
+========
+
+
+
+!!!!! export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
+
 
 This is the [argus](FIXME) device for [YARP](https://www.yarp.it/).
 It supports the FIXME
