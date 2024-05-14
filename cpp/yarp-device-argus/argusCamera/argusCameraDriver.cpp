@@ -29,6 +29,8 @@ using namespace yarp::sig;
 using namespace yarp::os;
 
 using namespace std;
+using namespace Argus;
+using namespace EGLStream;
 
 // VERY IMPORTANT ABOUT WHITE BALANCE: the YARP interfaces cannot allow to set a feature with
 // 3 values, 2 is maximum and until now we always used blue and red in this order. Then we ignore
@@ -44,11 +46,11 @@ static const std::vector<cameraFeature_id_t> features_with_auto{YARP_FEATURE_EXP
 
 // Values taken from the balser documentation for IMX415-C FIXME! TO BE CHECKED!
 static const std::map<cameraFeature_id_t, std::pair<double, double>> featureMinMax{{YARP_FEATURE_BRIGHTNESS, {-1.0, 1.0}},
-                                                                                   {YARP_FEATURE_EXPOSURE, {68.0, 2300000.0}},
+                                                                                   {YARP_FEATURE_EXPOSURE, {68.0, 2300000.0}}, //-10,10, -10,10
                                                                                    {YARP_FEATURE_SHARPNESS, {0.0, 1.0}},
                                                                                    {YARP_FEATURE_WHITE_BALANCE, {1.0, 8.0}},  // not sure about it, the doc is not clear, found empirically
                                                                                    //{YARP_FEATURE_GAMMA, {0.0, 4.0}},
-                                                                                   {YARP_FEATURE_GAIN, {0.0, 33.06}}};
+                                                                                   {YARP_FEATURE_GAIN, {0.0, 33.06}}}; //1,3981.07, 1,3981.07
 
 //static const std::map<double, int> rotationToCVRot{{90.0, ROTATE_90_CLOCKWISE}, {-90.0, ROTATE_90_COUNTERCLOCKWISE}, {180.0, ROTATE_180}};
 
@@ -103,8 +105,6 @@ bool argusCameraDriver::open(Searchable& config)
     bool ok{true};
     yCDebug(ARGUS_CAMERA) << "input params are " << config.toString();
 
-    // FIXME parse generator part
-
     if(!parseParams(config)) {
         yCError(ARGUS_CAMERA) << "Error parsing parameters";
         return false;
@@ -119,12 +119,89 @@ bool argusCameraDriver::open(Searchable& config)
         yCDebug(ARGUS_CAMERA) << "Rotation with crop";
     }
 
-    double period = 0.0;  // FIXME we will parse it from the config
-
-    if (period != 0.0)
+    if (m_period != 0.0)
     {
-        m_fps = 1.0 / period;  // the fps has to be aligned with the nws period
+        m_fps = 1.0 / m_period;  // the fps has to be aligned with the nws period
+        // FIXME set_framerate
     }
+
+    UniqueObj<CameraProvider> cameraProvider = UniqueObj<CameraProvider>(CameraProvider::create());
+    ICameraProvider *iCameraProvider = interface_cast<ICameraProvider>(cameraProvider);
+    if (!iCameraProvider)
+        yCError(ARGUS_CAMERA) << "Failed to create CameraProvider";
+
+    /* Get the camera devices */
+    std::vector<CameraDevice*> cameraDevices;
+    iCameraProvider->getCameraDevices(&cameraDevices);
+    if (cameraDevices.size() == 0)
+        yCError(ARGUS_CAMERA) << "No cameras available";
+
+    ICameraProperties *iCameraProperties = interface_cast<ICameraProperties>(cameraDevices[0]);
+    if (!iCameraProperties)
+        yCError(ARGUS_CAMERA) << "Failed to get ICameraProperties interface";
+
+    /* Create the capture session using the first device and get the core interface */
+    UniqueObj<CaptureSession> captureSession(
+            iCameraProvider->createCaptureSession(cameraDevices[0]));
+    ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(captureSession);
+    if (!iCaptureSession)
+        yCError(ARGUS_CAMERA) << "Failed to get ICaptureSession interface";
+    
+    // yCDebug(ARGUS_CAMERA) << "Starting" << iCameraProperties->getModelName();
+
+    UniqueObj<OutputStreamSettings> streamSettings(
+        iCaptureSession->createOutputStreamSettings(STREAM_TYPE_EGL));
+    IEGLOutputStreamSettings *iEglStreamSettings =
+        interface_cast<IEGLOutputStreamSettings>(streamSettings);
+    if (!iEglStreamSettings)
+        yCError(ARGUS_CAMERA) << "Failed to get IEGLOutputStreamSettings interface";
+
+    Size2D<uint32_t> resolution{1920, 1080};
+    iEglStreamSettings->setPixelFormat(PIXEL_FMT_YCbCr_420_888);
+    iEglStreamSettings->setResolution(resolution);
+
+    m_stream = iCaptureSession->createOutputStream(streamSettings.get());
+
+    std::vector<EventType> eventTypes;
+    eventTypes.push_back(EVENT_TYPE_CAPTURE_COMPLETE);
+    eventTypes.push_back(EVENT_TYPE_ERROR);
+    eventTypes.push_back(EVENT_TYPE_CAPTURE_STARTED);
+
+    m_eventProvider = interface_cast<IEventProvider>(captureSession);
+    m_queue = UniqueObj<EventQueue>(m_eventProvider->createEventQueue(eventTypes));
+
+    /* Create the FrameConsumer. */
+    m_consumer = UniqueObj<FrameConsumer>(FrameConsumer::create(m_stream));
+
+    if (!m_consumer)
+        yCError(ARGUS_CAMERA) << "Failed to create FrameConsumer";
+
+    // IEGLOutputStream *iEglOutputStream = interface_cast<IEGLOutputStream>(m_stream);
+    IFrameConsumer *iFrameConsumer = interface_cast<IFrameConsumer>(m_consumer);
+    IEventQueue *iQueue = interface_cast<IEventQueue>(m_queue);
+
+    Argus::UniqueObj<Argus::Request> request(
+        iCaptureSession->createRequest(Argus::CAPTURE_INTENT_STILL_CAPTURE));
+
+    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(request);
+    Argus::Status argusStatus;
+
+    argusStatus = iRequest->enableOutputStream(m_stream);
+
+    // Argus::ISourceSettings *iSourceSettings =
+    //     Argus::interface_cast<Argus::ISourceSettings>(request);
+
+    uint32_t requestId = iCaptureSession->capture(request.get());
+
+    /* Acquire a frame. */
+    UniqueObj<Frame> frame(iFrameConsumer->acquireFrame(3000000000, &argusStatus));
+    IFrame *iFrame = interface_cast<IFrame>(frame);
+    auto image = iFrame->getImage();
+
+    auto image2d_interface(Argus::interface_cast<EGLStream::IImage2D>(image));
+    auto img_size = image2d_interface->getSize();
+
+    yCDebug(ARGUS_CAMERA) << "Img size:" << img_size[0] << img_size[1];
 
     return ok && startCamera();
 }
