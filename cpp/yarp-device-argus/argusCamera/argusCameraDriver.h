@@ -9,8 +9,8 @@
 #ifndef ARGUS_DRIVER_H
 #define ARGUS_DRIVER_H
 
-// FIXME argus includes
 #include <Argus/Argus.h>
+#include <EGLStream/EGLStream.h>
 
 #include "argusCameraDriver_ParamsParser.h"
 
@@ -182,5 +182,11 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     float m_fps{30.0};
 
     // FIXME argus camera pointer
+
+    Argus::OutputStream* m_stream;
+    Argus::UniqueObj<EGLStream::FrameConsumer> m_consumer;
+
+    Argus::IEventProvider* m_eventProvider;
+    Argus::UniqueObj<Argus::EventQueue> m_queue;
 };
 #endif  // ARGUS_DRIVER_H
