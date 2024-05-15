@@ -181,12 +181,11 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     bool m_initialized{false};
     float m_fps{30.0};
 
-    // FIXME argus camera pointer
-
-    Argus::OutputStream* m_stream;
+    Argus::UniqueObj<Argus::CameraProvider> m_cameraProvider;
+    Argus::UniqueObj<Argus::OutputStream> m_stream;
+    Argus::UniqueObj<Argus::Request> m_request;
+    Argus::UniqueObj<Argus::CaptureSession> m_captureSession;
     Argus::UniqueObj<EGLStream::FrameConsumer> m_consumer;
-
-    Argus::IEventProvider* m_eventProvider;
-    Argus::UniqueObj<Argus::EventQueue> m_queue;
+    std::vector<Argus::CameraDevice*> m_cameraDevices;
 };
 #endif  // ARGUS_DRIVER_H

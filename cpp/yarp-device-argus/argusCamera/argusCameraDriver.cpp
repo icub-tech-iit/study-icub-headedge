@@ -125,83 +125,58 @@ bool argusCameraDriver::open(Searchable& config)
         // FIXME set_framerate
     }
 
-    UniqueObj<CameraProvider> cameraProvider = UniqueObj<CameraProvider>(CameraProvider::create());
-    ICameraProvider *iCameraProvider = interface_cast<ICameraProvider>(cameraProvider);
+    m_cameraProvider.reset(CameraProvider::create());
+    ICameraProvider *iCameraProvider = interface_cast<ICameraProvider>(m_cameraProvider);
     if (!iCameraProvider)
+    {
         yCError(ARGUS_CAMERA) << "Failed to create CameraProvider";
+    }
 
     /* Get the camera devices */
-    std::vector<CameraDevice*> cameraDevices;
-    iCameraProvider->getCameraDevices(&cameraDevices);
-    if (cameraDevices.size() == 0)
+    iCameraProvider->getCameraDevices(&m_cameraDevices);
+    if (m_cameraDevices.size() == 0)
+    {
         yCError(ARGUS_CAMERA) << "No cameras available";
+    }
 
-    ICameraProperties *iCameraProperties = interface_cast<ICameraProperties>(cameraDevices[0]);
+    ICameraProperties *iCameraProperties = interface_cast<ICameraProperties>(m_cameraDevices[0]);
     if (!iCameraProperties)
+    {
         yCError(ARGUS_CAMERA) << "Failed to get ICameraProperties interface";
+    }
 
     /* Create the capture session using the first device and get the core interface */
-    UniqueObj<CaptureSession> captureSession(
-            iCameraProvider->createCaptureSession(cameraDevices[0]));
-    ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(captureSession);
+    m_captureSession.reset(iCameraProvider->createCaptureSession(m_cameraDevices[0]));
+    ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
     if (!iCaptureSession)
+    {
         yCError(ARGUS_CAMERA) << "Failed to get ICaptureSession interface";
-    
-    // yCDebug(ARGUS_CAMERA) << "Starting" << iCameraProperties->getModelName();
+    }
 
-    UniqueObj<OutputStreamSettings> streamSettings(
-        iCaptureSession->createOutputStreamSettings(STREAM_TYPE_EGL));
-    IEGLOutputStreamSettings *iEglStreamSettings =
-        interface_cast<IEGLOutputStreamSettings>(streamSettings);
+    UniqueObj<OutputStreamSettings> streamSettings(iCaptureSession->createOutputStreamSettings(STREAM_TYPE_EGL));
+    IEGLOutputStreamSettings *iEglStreamSettings = interface_cast<IEGLOutputStreamSettings>(streamSettings);
     if (!iEglStreamSettings)
+    {
         yCError(ARGUS_CAMERA) << "Failed to get IEGLOutputStreamSettings interface";
+    }
 
     Size2D<uint32_t> resolution{1920, 1080};
     iEglStreamSettings->setPixelFormat(PIXEL_FMT_YCbCr_420_888);
     iEglStreamSettings->setResolution(resolution);
 
-    m_stream = iCaptureSession->createOutputStream(streamSettings.get());
-
-    std::vector<EventType> eventTypes;
-    eventTypes.push_back(EVENT_TYPE_CAPTURE_COMPLETE);
-    eventTypes.push_back(EVENT_TYPE_ERROR);
-    eventTypes.push_back(EVENT_TYPE_CAPTURE_STARTED);
-
-    m_eventProvider = interface_cast<IEventProvider>(captureSession);
-    m_queue = UniqueObj<EventQueue>(m_eventProvider->createEventQueue(eventTypes));
-
-    /* Create the FrameConsumer. */
-    m_consumer = UniqueObj<FrameConsumer>(FrameConsumer::create(m_stream));
+    m_stream.reset(iCaptureSession->createOutputStream(streamSettings.get()));
+    m_consumer.reset(FrameConsumer::create(m_stream.get()));
 
     if (!m_consumer)
+    {
         yCError(ARGUS_CAMERA) << "Failed to create FrameConsumer";
+    }
 
-    // IEGLOutputStream *iEglOutputStream = interface_cast<IEGLOutputStream>(m_stream);
-    IFrameConsumer *iFrameConsumer = interface_cast<IFrameConsumer>(m_consumer);
-    IEventQueue *iQueue = interface_cast<IEventQueue>(m_queue);
-
-    Argus::UniqueObj<Argus::Request> request(
-        iCaptureSession->createRequest(Argus::CAPTURE_INTENT_STILL_CAPTURE));
-
-    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(request);
+    m_request.reset(iCaptureSession->createRequest(Argus::CAPTURE_INTENT_PREVIEW));
+    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
     Argus::Status argusStatus;
-
-    argusStatus = iRequest->enableOutputStream(m_stream);
-
-    // Argus::ISourceSettings *iSourceSettings =
-    //     Argus::interface_cast<Argus::ISourceSettings>(request);
-
-    uint32_t requestId = iCaptureSession->capture(request.get());
-
-    /* Acquire a frame. */
-    UniqueObj<Frame> frame(iFrameConsumer->acquireFrame(3000000000, &argusStatus));
-    IFrame *iFrame = interface_cast<IFrame>(frame);
-    auto image = iFrame->getImage();
-
-    auto image2d_interface(Argus::interface_cast<EGLStream::IImage2D>(image));
-    auto img_size = image2d_interface->getSize();
-
-    yCDebug(ARGUS_CAMERA) << "Img size:" << img_size[0] << img_size[1];
+    argusStatus = iRequest->enableOutputStream(m_stream.get());
+    iCaptureSession->repeat(m_request.get());
 
     return ok && startCamera();
 }
@@ -585,7 +560,20 @@ bool argusCameraDriver::setOnePush(int feature)
 bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
-    //FIXME
+    IFrameConsumer *iFrameConsumer = interface_cast<IFrameConsumer>(m_consumer);
+    
+    /* Acquire a frame. */
+    Argus::Status status;
+    UniqueObj<Frame> frame(iFrameConsumer->acquireFrame(3000000000, &status));
+    IFrame *iFrame = interface_cast<IFrame>(frame);
+
+    if(iFrame)
+    {
+        auto image2d_interface(Argus::interface_cast<EGLStream::IImage2D>(iFrame->getImage()));
+        auto img_size = image2d_interface->getSize();
+        yCDebug(ARGUS_CAMERA) << "Img size:" << img_size[0] << img_size[1];
+    }
+    
     return true;
 }
 
