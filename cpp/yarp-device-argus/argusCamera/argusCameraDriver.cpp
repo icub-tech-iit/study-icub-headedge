@@ -145,6 +145,18 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "Failed to get ICameraProperties interface";
     }
 
+    iCameraProperties->getAllSensorModes(&sensorModes);
+    if (sensorModes.size() == 0)
+    {
+        yCError(ARGUS_CAMERA) << "Failed to get sensor modes";
+    }
+
+    Size2D<uint32_t> resolution;
+    for (uint32_t i = 0; i < sensorModes.size(); i++) {
+        iSensorMode = interface_cast<ISensorMode>(sensorModes[i]);
+        resolution = iSensorMode->getResolution();
+    }
+
     /* Create the capture session using the first device and get the core interface */
     m_captureSession.reset(iCameraProvider->createCaptureSession(m_cameraDevices[0]));
     ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
@@ -160,8 +172,8 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "Failed to get IEGLOutputStreamSettings interface";
     }
 
-    Size2D<uint32_t> resolution{1920, 1080};
     iEglStreamSettings->setPixelFormat(PIXEL_FMT_YCbCr_420_888);
+    // iEglStreamSettings->getPixelFormat();
     iEglStreamSettings->setResolution(resolution);
 
     m_stream.reset(iCaptureSession->createOutputStream(streamSettings.get()));
@@ -569,11 +581,23 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
 
     if(iFrame)
     {
-        auto image2d_interface(Argus::interface_cast<EGLStream::IImage2D>(iFrame->getImage()));
-        auto img_size = image2d_interface->getSize();
-        yCDebug(ARGUS_CAMERA) << "Img size:" << img_size[0] << img_size[1];
+        auto img = iFrame->getImage();
+        auto img_interface(Argus::interface_cast<EGLStream::IImage>(img));
+        // auto img_2d(Argus::interface_cast<EGLStream::IImage2D>(img));
+        // auto img_size = img_2d->getSize();
+
+        iSensorMode = interface_cast<ISensorMode>(sensorModes[0]);
+        // m_width = iSensorMode->getResolution().width(); //1920
+        // m_height = iSensorMode->getResolution().height(); //1080
+        m_width = 640;
+        m_height = 480;
+        yCDebug(ARGUS_CAMERA) << "width" << m_width;
+        yCDebug(ARGUS_CAMERA) << "height" << m_height;
+        size_t mem_to_wrt = m_width * m_height * image.getPixelSize();
+        image.resize(m_width, m_height);
+
+        memcpy((void*)image.getRawImage(), (uint8_t*)img_interface->mapBuffer(), mem_to_wrt);
     }
-    
     return true;
 }
 

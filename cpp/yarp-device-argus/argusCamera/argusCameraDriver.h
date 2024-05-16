@@ -11,6 +11,7 @@
 
 #include <Argus/Argus.h>
 #include <EGLStream/EGLStream.h>
+#include <EGLStream/NV/ImageNativeBuffer.h>
 
 #include "argusCameraDriver_ParamsParser.h"
 
@@ -187,5 +188,7 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     Argus::UniqueObj<Argus::CaptureSession> m_captureSession;
     Argus::UniqueObj<EGLStream::FrameConsumer> m_consumer;
     std::vector<Argus::CameraDevice*> m_cameraDevices;
+    Argus::ISensorMode *iSensorMode;
+    std::vector<Argus::SensorMode*> sensorModes;
 };
 #endif  // ARGUS_DRIVER_H
