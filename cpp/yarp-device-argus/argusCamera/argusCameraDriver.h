@@ -23,6 +23,9 @@
 #include <yarp/os/Stamp.h>
 #include <yarp/sig/Matrix.h>
 #include <yarp/sig/all.h>
+#include <yarp/cv/Cv.h>
+
+#include <opencv2/opencv.hpp>
 
 #include <cstring>
 #include <iostream>

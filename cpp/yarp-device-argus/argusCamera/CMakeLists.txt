@@ -28,9 +28,9 @@ if(ENABLE_argusCamera)
       argusCameraDriver_ParamsParser.cpp
   )
 
-#   list(APPEND OPENCV_DEPS  opencv_core
-#                            opencv_video
-#                            opencv_imgproc)
+  list(APPEND OPENCV_DEPS opencv_core
+                          opencv_video
+                          opencv_imgproc)
 
   if (CUDA_FOUND AND OpenCV_CUDA_VERSION AND TRY_ACTIVATE_CUDA)
     target_compile_definitions(yarp_argusCamera PUBLIC -DUSE_CUDA)
@@ -49,6 +49,7 @@ if(ENABLE_argusCamera)
       YARP::YARP_cv
     PRIVATE
       ${ARGUS_LIBRARIES}
+      ${OPENCV_DEPS}
     # FIXME argus libs
     # FIXME opencv libs
   )
