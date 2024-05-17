@@ -151,11 +151,11 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "Failed to get sensor modes";
     }
 
-    Size2D<uint32_t> resolution;
-    for (uint32_t i = 0; i < sensorModes.size(); i++) {
-        iSensorMode = interface_cast<ISensorMode>(sensorModes[i]);
-        resolution = iSensorMode->getResolution();
-    }
+    // Size2D<uint32_t> resolution;
+    // for (uint32_t i = 0; i < sensorModes.size(); i++) {
+    //     iSensorMode = interface_cast<ISensorMode>(sensorModes[i]);
+    //     resolution = iSensorMode->getResolution();
+    // }
 
     /* Create the capture session using the first device and get the core interface */
     m_captureSession.reset(iCameraProvider->createCaptureSession(m_cameraDevices[0]));
@@ -172,8 +172,8 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "Failed to get IEGLOutputStreamSettings interface";
     }
 
+    Size2D<uint32_t> resolution{1920,1080};
     iEglStreamSettings->setPixelFormat(PIXEL_FMT_YCbCr_420_888);
-    // iEglStreamSettings->getPixelFormat();
     iEglStreamSettings->setResolution(resolution);
     iEglStreamSettings->setMetadataEnable(true);
 
@@ -185,7 +185,7 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "Failed to create FrameConsumer";
     }
 
-    m_request.reset(iCaptureSession->createRequest(Argus::CAPTURE_INTENT_PREVIEW));
+    m_request.reset(iCaptureSession->createRequest(Argus::CAPTURE_INTENT_VIDEO_RECORD));
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
     Argus::Status argusStatus;
     argusStatus = iRequest->enableOutputStream(m_stream.get());
@@ -585,7 +585,7 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         auto img = iFrame->getImage();
         auto img_interface(Argus::interface_cast<EGLStream::IImage>(img));
         auto img_2d(Argus::interface_cast<EGLStream::IImage2D>(img));
-        // auto img_size = img_2d->getSize(0);
+        auto img_size = img_2d->getSize(0);
         for (uint32_t i = 0; i < img_interface->getBufferCount(); i++)
         {
             const uint8_t *d = static_cast<const uint8_t*>(img_interface->mapBuffer(i));
@@ -599,59 +599,38 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
                            i, size.width(), size.height(), img_2d->getStride(i),
                            d[0], d[1], d[2], d[3], d[4], d[5],
                            d[6], d[7], d[8], d[9], d[10], d[11]);
-        }
-
-        IImageJPEG *iJPEG = interface_cast<IImageJPEG>(img);
-        if (iJPEG)
-        {
-            char path[256];
-            snprintf(path, sizeof(path), "%llu.JPG",
-                     static_cast<unsigned long long>(iFrame->getNumber()));
-            Argus::Status status = iJPEG->writeJPEG(path);
-            if (status == STATUS_OK)
-                yDebug("\tWrote JPEG: %s\n", path);
-            else
-                yDebug("\tFailed to write JPEG: %s (status %d)\n", path, status);
+            yDebug() << img_interface->getBufferSize(i);
         }
 
         iSensorMode = interface_cast<ISensorMode>(sensorModes[0]);
         m_width = iSensorMode->getResolution().width(); 
         m_height = iSensorMode->getResolution().height();
-
-        // Calculate the size of the Y, U, and V planes
-        int y_size = m_width * m_height;
-        int uv_size = y_size / 4;  // For YUV 420, U and V are 1/4th the size of Y
-
-        // Extract Y, U, and V planes from the input data
-        const unsigned char* data = static_cast<const unsigned char*>(img_interface->mapBuffer());
-        cv::Mat y_plane(m_height, m_width, CV_8UC1, data[0]);
-        cv::Mat u_plane(m_height / 2, m_width / 2, CV_8UC1, data[y_size]);
-        cv::Mat v_plane(m_height / 2, m_width / 2, CV_8UC1, data[y_size + uv_size]);
-
-        // Upsample U and V planes to the size of Y
-        cv::Mat u_plane_resized, v_plane_resized;
-        cv::resize(u_plane, u_plane_resized, cv::Size(m_width, m_height), 0, 0, cv::INTER_LINEAR);
-        cv::resize(v_plane, v_plane_resized, cv::Size(m_width, m_height), 0, 0, cv::INTER_LINEAR);
-
-        // Merge Y, U, and V planes into a single 3-channel image
-        std::vector<cv::Mat> yuv_channels = { y_plane, u_plane_resized, v_plane_resized };
-        cv::Mat yuv_image;
-        cv::merge(yuv_channels, yuv_image);
-
-        // Convert YUV to BGR (which is the default color space used by OpenCV for images)
-        cv::Mat bgr_image;
-        cv::cvtColor(yuv_image, bgr_image, cv::COLOR_YUV2BGR);
-
-        // Convert BGR to RGB
-        // cv::Mat rgb_image;
-        // cv::cvtColor(bgr_image, rgb_image, cv::COLOR_BGR2RGB);
-
-        // cv::Mat rotated(1.5*m_height, m_width, CV_8UC3, (uint8_t*)img_interface->mapBuffer());
-        // cv::Mat bgr_image;
-        // cv::cvtColor(rotated, bgr_image, cv::COLOR_YUV2BGR_IYUV);
         image.resize(m_width, m_height);
-        image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(u_plane_resized));
 
+        // cv::Mat bgr_image; 
+        // cv::Mat y_plane(m_height, m_width, CV_8UC1, (uint8_t*)img_interface->mapBuffer(0, nullptr));
+        // cv::Mat u_plane(m_height/2.0, m_width/2.0, CV_16UC1, (uint16_t*)img_interface->mapBuffer(1, nullptr));
+        // cv::cvtColorTwoPlane(y_plane, u_plane, bgr_image, cv::COLOR_YUV2BGR_NV12);
+  
+        NvBufSurface* nvBufSurface = nullptr;
+        if (NvBufSurfaceFromEGLImage(&nvBufSurface, img) != 0) {
+            yCDebug(ARGUS_CAMERA) << "Failed to convert EGLImage to NvBufSurface";
+            return -1;
+        }
+
+        NvBufSurfaceMap(surf, -1, -1, NVBUF_MAP_READ_WRITE);
+
+        // iNativeBuffer->copyToNvBuffer(fd);
+        // NvBufSurfaceMap(fd, 0, NVBUF_MEM_DEFAULT, &pdata); 
+        NvBufSurfaceSyncForCpu(params->fd, 0, &pdata); 
+        cv::Mat imgbuf = cv::Mat(iSensorMode->getResolution().height(), iSensorMode->getResolution().width(), CV_8UC3, (uint16_t*)img_interface->mapBuffer(0, nullptr)); 
+        cv::Mat display_img;
+        cv::cvtColor(imgbuf, display_img, cv::COLOR_YUV2BGR); 
+        // NvBufSurfaceUnMap(fd, 0, &pdata); 
+        cv::imshow("img", display_img); 
+        cv::waitKey(1);
+
+        // image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(bgr_image));
         // memcpy((void*)image.getRawImage(), (uint8_t*)img_interface->mapBuffer(), img_interface->getBufferSize());
     }
     return true;

@@ -12,6 +12,7 @@
 #include <Argus/Argus.h>
 #include <EGLStream/EGLStream.h>
 #include <EGLStream/NV/ImageNativeBuffer.h>
+#include <EGLStream/NV/NvBufSurface.h>
 
 #include "argusCameraDriver_ParamsParser.h"
 
