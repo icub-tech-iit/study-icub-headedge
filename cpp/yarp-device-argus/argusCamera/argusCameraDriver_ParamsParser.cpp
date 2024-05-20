@@ -8,7 +8,7 @@
 // This is an automatically generated file. Please do not edit it.
 // It will be re-generated if the cmake flag ALLOW_DEVICE_PARAM_PARSER_GERNERATION is ON.
 
-// Generated on: Fri May 17 11:03:21 2024
+// Generated on: Mon May 20 16:57:19 2024
 
 
 #include "argusCameraDriver_ParamsParser.h"
@@ -176,7 +176,7 @@ std::string      argusCameraDriver_ParamsParser::getDocumentationOfDeviceParams(
     doc = doc + std::string("'rotation_with_crop': The rotation, if the param is true, is obtained swapping x with y\n");
     doc = doc + std::string("\n");
     doc = doc + std::string("Here are some examples of invocation command with yarpdev, with all params:\n");
-    doc = doc + " yarpdev --device argusCamera --d 0 --period 0.033 --rotation 0.0 --width 640 --height 480 --rotation_with_crop false\n";
+    doc = doc + " yarpdev --device argusCamera --d 1 --period 0.033 --rotation 0.0 --width 640 --height 480 --rotation_with_crop false\n";
     doc = doc + std::string("Using only mandatory params:\n");
     doc = doc + " yarpdev --device argusCamera\n";
     doc = doc + std::string("=============================================\n\n");    return doc;

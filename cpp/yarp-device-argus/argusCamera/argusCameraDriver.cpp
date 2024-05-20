@@ -150,13 +150,7 @@ bool argusCameraDriver::open(Searchable& config)
     {
         yCError(ARGUS_CAMERA) << "Failed to get sensor modes";
     }
-
-    // Size2D<uint32_t> resolution;
-    // for (uint32_t i = 0; i < sensorModes.size(); i++) {
-    //     iSensorMode = interface_cast<ISensorMode>(sensorModes[i]);
-    //     resolution = iSensorMode->getResolution();
-    // }
-
+    
     /* Create the capture session using the first device and get the core interface */
     m_captureSession.reset(iCameraProvider->createCaptureSession(m_cameraDevices[0]));
     ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
@@ -175,7 +169,7 @@ bool argusCameraDriver::open(Searchable& config)
     Size2D<uint32_t> resolution{1920,1080};
     iEglStreamSettings->setPixelFormat(PIXEL_FMT_YCbCr_420_888);
     iEglStreamSettings->setResolution(resolution);
-    iEglStreamSettings->setMetadataEnable(true);
+    // iEglStreamSettings->setMetadataEnable(true);
 
     m_stream.reset(iCaptureSession->createOutputStream(streamSettings.get()));
     m_consumer.reset(FrameConsumer::create(m_stream.get()));
@@ -576,63 +570,72 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
     IFrameConsumer *iFrameConsumer = interface_cast<IFrameConsumer>(m_consumer);
     
     /* Acquire a frame. */
-    Argus::Status status;
-    UniqueObj<Frame> frame(iFrameConsumer->acquireFrame(3000000000, &status));
+    // Argus::Status status;
+    int fd = -1;
+    UniqueObj<Frame> frame(iFrameConsumer->acquireFrame());
     IFrame *iFrame = interface_cast<IFrame>(frame);
+    void *pdata1 = nullptr;
+    NvBufSurface* nvBufSurface = nullptr;
 
     if(iFrame)
     {
         auto img = iFrame->getImage();
-        auto img_interface(Argus::interface_cast<EGLStream::IImage>(img));
-        auto img_2d(Argus::interface_cast<EGLStream::IImage2D>(img));
-        auto img_size = img_2d->getSize(0);
-        for (uint32_t i = 0; i < img_interface->getBufferCount(); i++)
-        {
-            const uint8_t *d = static_cast<const uint8_t*>(img_interface->mapBuffer(i));
-            if (!d)
-                yCDebug(ARGUS_CAMERA) << "\tFailed to map buffer\n";
-
-            Size2D<uint32_t> size = img_2d->getSize(i);
-            yDebug("\tIImage(2D): "
-                           "buffer %u (%ux%u, %u stride), "
-                           "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                           i, size.width(), size.height(), img_2d->getStride(i),
-                           d[0], d[1], d[2], d[3], d[4], d[5],
-                           d[6], d[7], d[8], d[9], d[10], d[11]);
-            yDebug() << img_interface->getBufferSize(i);
-        }
+        // auto img_interface(Argus::interface_cast<EGLStream::IImage>(img));
+        // auto img_2d(Argus::interface_cast<EGLStream::IImage2D>(img));
 
         iSensorMode = interface_cast<ISensorMode>(sensorModes[0]);
         m_width = iSensorMode->getResolution().width(); 
         m_height = iSensorMode->getResolution().height();
         image.resize(m_width, m_height);
 
-        // cv::Mat bgr_image; 
-        // cv::Mat y_plane(m_height, m_width, CV_8UC1, (uint8_t*)img_interface->mapBuffer(0, nullptr));
-        // cv::Mat u_plane(m_height/2.0, m_width/2.0, CV_16UC1, (uint16_t*)img_interface->mapBuffer(1, nullptr));
-        // cv::cvtColorTwoPlane(y_plane, u_plane, bgr_image, cv::COLOR_YUV2BGR_NV12);
-  
-        NvBufSurface* nvBufSurface = nullptr;
-        if (NvBufSurfaceFromEGLImage(&nvBufSurface, img) != 0) {
-            yCDebug(ARGUS_CAMERA) << "Failed to convert EGLImage to NvBufSurface";
-            return -1;
+        NV::IImageNativeBuffer *iNativeBuffer = interface_cast<NV::IImageNativeBuffer>(img);
+        if (!iNativeBuffer)
+        {
+            yCError(ARGUS_CAMERA) <<"IImageNativeBuffer not supported by Image."; 
         }
 
-        NvBufSurfaceMap(surf, -1, -1, NVBUF_MAP_READ_WRITE);
+        // Create NvBuffer
 
-        // iNativeBuffer->copyToNvBuffer(fd);
-        // NvBufSurfaceMap(fd, 0, NVBUF_MEM_DEFAULT, &pdata); 
-        NvBufSurfaceSyncForCpu(params->fd, 0, &pdata); 
-        cv::Mat imgbuf = cv::Mat(iSensorMode->getResolution().height(), iSensorMode->getResolution().width(), CV_8UC3, (uint16_t*)img_interface->mapBuffer(0, nullptr)); 
-        cv::Mat display_img;
-        cv::cvtColor(imgbuf, display_img, cv::COLOR_YUV2BGR); 
-        // NvBufSurfaceUnMap(fd, 0, &pdata); 
-        cv::imshow("img", display_img); 
-        cv::waitKey(1);
+        if (fd == -1)
+        {
+            fd = iNativeBuffer->createNvBuffer(iSensorMode->getResolution(), NVBUF_COLOR_FORMAT_RGBA, NVBUF_LAYOUT_PITCH);
+            if (!fd)
+            {
+                yCError(ARGUS_CAMERA) << "Failed to create NvBuffer";
+            }
 
-        // image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(bgr_image));
+            if (NvBufSurfaceFromFd(fd, (void**)(&nvBufSurface)) == -1)
+            {
+                yCError(ARGUS_CAMERA) << "Cannot get NvBufSurface from fd";
+            }
+        }
+
+        else if (iNativeBuffer->copyToNvBuffer(fd != STATUS_OK))
+        {
+            yCError(ARGUS_CAMERA) << "Failed to copy frame to NvBuffer.";
+        }
+
+        NvBufSurfaceMap(nvBufSurface, -1, 0, NVBUF_MAP_READ_WRITE);
+        NvBufSurfaceSyncForCpu(nvBufSurface, -1, 0);
+
+        // Create OpenCV Mat from the buffer
+        pdata1 = nvBufSurface->surfaceList[0].mappedAddr.addr[0];
+        cv::Mat imgbuf1(iSensorMode->getResolution().height(), iSensorMode->getResolution().width(), CV_8UC4, pdata1);
+
+        // Convert color from RGBA to BGR
+        cv::Mat display_img(iSensorMode->getResolution().height(), iSensorMode->getResolution().width(), CV_8UC3);
+        cv::cvtColor(imgbuf1, display_img, cv::COLOR_RGBA2BGR);
+
+        image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(display_img));
+
+        // Unmap the buffer memory
+        if (NvBufSurfaceUnMap(nvBufSurface, -1, 0) != 0) {
+            std::cerr << "Failed to unmap NvBufSurface" << std::endl;
+        }
+
         // memcpy((void*)image.getRawImage(), (uint8_t*)img_interface->mapBuffer(), img_interface->getBufferSize());
     }
+
     return true;
 }
 
