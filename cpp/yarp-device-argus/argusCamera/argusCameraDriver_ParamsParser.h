@@ -8,7 +8,7 @@
 // This is an automatically generated file. Please do not edit it.
 // It will be re-generated if the cmake flag ALLOW_DEVICE_PARAM_PARSER_GERNERATION is ON.
 
-// Generated on: Fri May 17 11:03:21 2024
+// Generated on: Mon May 20 16:57:19 2024
 
 
 #ifndef ARGUSCAMERADRIVER_PARAMSPARSER_H
@@ -25,7 +25,7 @@
 * These are the used parameters:
 * | Group name | Parameter name     | Type   | Units   | Default Value | Required | Description                                                       | Notes                                                                                                                                                   |
 * |:----------:|:------------------:|:------:|:-------:|:-------------:|:--------:|:-----------------------------------------------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------:|
-* | -          | d                  | int    | -       | 0             | 0        | Enumeration of the camera device                                  | -                                                                                                                                                       |
+* | -          | d                  | int    | -       | 1             | 0        | Enumeration of the camera device                                  | -                                                                                                                                                       |
 * | -          | period             | double | seconds | 0.033         | 0        | Refresh period of acquistion of the camera in s                   | Check the camera documentation for the fps cap                                                                                                          |
 * | -          | rotation           | double | degrees | 0.0           | 0        | Rotation applied from the center of the image                     | Depending the size requested some rotations are not allowed. The rotation worse the performance of the device. Allowed values: 0.0, 90.0, -90.0, 180.0. |
 * | -          | width              | int    | pixel   | 640           | 0        | Width of the images requested to the camera                       | The cameras has a value cap for the width of the image that can provide, check the documentation. Zero or negative value not accepted                   |
@@ -34,7 +34,7 @@
 *
 * The device can be launched by yarpdev using one of the following examples (with and without all optional parameters):
 * \code{.unparsed}
-* yarpdev --device argusCamera --d 0 --period 0.033 --rotation 0.0 --width 640 --height 480 --rotation_with_crop false
+* yarpdev --device argusCamera --d 1 --period 0.033 --rotation 0.0 --width 640 --height 480 --rotation_with_crop false
 * \endcode
 *
 * \code{.unparsed}
@@ -60,14 +60,14 @@ public:
     };
     const parser_version_type m_parser_version = {};
 
-    const std::string m_d_defaultValue = {"0"};
+    const std::string m_d_defaultValue = {"1"};
     const std::string m_period_defaultValue = {"0.033"};
     const std::string m_rotation_defaultValue = {"0.0"};
     const std::string m_width_defaultValue = {"640"};
     const std::string m_height_defaultValue = {"480"};
     const std::string m_rotation_with_crop_defaultValue = {"false"};
 
-    int m_d = {0};
+    int m_d = {1};
     double m_period = {0.033};
     double m_rotation = {0.0};
     int m_width = {640};
