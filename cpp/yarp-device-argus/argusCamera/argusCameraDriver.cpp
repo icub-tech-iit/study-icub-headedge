@@ -179,7 +179,7 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "Failed to create FrameConsumer";
     }
 
-    m_request.reset(iCaptureSession->createRequest(Argus::CAPTURE_INTENT_VIDEO_RECORD));
+    m_request.reset(iCaptureSession->createRequest(Argus::CAPTURE_INTENT_PREVIEW));
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
     Argus::Status argusStatus;
     argusStatus = iRequest->enableOutputStream(m_stream.get());
@@ -570,10 +570,10 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
     IFrameConsumer *iFrameConsumer = interface_cast<IFrameConsumer>(m_consumer);
     
     /* Acquire a frame. */
-    // Argus::Status status;
-    int fd = -1;
-    UniqueObj<Frame> frame(iFrameConsumer->acquireFrame());
+    int fd;
+    UniqueObj<Frame> frame(iFrameConsumer->acquireFrame(TIMEOUT_INFINITE));
     IFrame *iFrame = interface_cast<IFrame>(frame);
+    // std::cout << iFrame->getNumber() << std::endl;
     void *pdata1 = nullptr;
     NvBufSurface* nvBufSurface = nullptr;
 
@@ -595,44 +595,41 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         }
 
         // Create NvBuffer
+        fd = iNativeBuffer->createNvBuffer(iSensorMode->getResolution(), NVBUF_COLOR_FORMAT_RGBA, NVBUF_LAYOUT_PITCH);
+        // if (!fd)
+        // {
+        //     yCError(ARGUS_CAMERA) << "Failed to create NvBuffer";
+        // }
 
-        if (fd == -1)
-        {
-            fd = iNativeBuffer->createNvBuffer(iSensorMode->getResolution(), NVBUF_COLOR_FORMAT_RGBA, NVBUF_LAYOUT_PITCH);
-            if (!fd)
-            {
-                yCError(ARGUS_CAMERA) << "Failed to create NvBuffer";
-            }
-
-            if (NvBufSurfaceFromFd(fd, (void**)(&nvBufSurface)) == -1)
-            {
-                yCError(ARGUS_CAMERA) << "Cannot get NvBufSurface from fd";
-            }
-        }
-
-        else if (iNativeBuffer->copyToNvBuffer(fd != STATUS_OK))
-        {
-            yCError(ARGUS_CAMERA) << "Failed to copy frame to NvBuffer.";
-        }
-
-        NvBufSurfaceMap(nvBufSurface, -1, 0, NVBUF_MAP_READ_WRITE);
-        NvBufSurfaceSyncForCpu(nvBufSurface, -1, 0);
+        // if (NvBuf*SurfaceFromFd(fd, (void*)(&nvBufSurface)) == -1)
+        // {
+        //     yCError(ARGUS_CAMERA) << "Cannot get NvBufSurface from fd";
+        // }
+        NvBufSurfaceFromFd(fd, (void**)(&nvBufSurface));
+        nvBufSurface->numFilled = 1;
+        NvBufSurfaceMap(nvBufSurface, 0, 0, NVBUF_MAP_READ);
+        // NvBufSurfaceSyncForCpu(nvBufSurface, 0, 0);
+        NvBufSurfaceSyncForDevice(nvBufSurface, 0, 0);
 
         // Create OpenCV Mat from the buffer
-        pdata1 = nvBufSurface->surfaceList[0].mappedAddr.addr[0];
+        pdata1 = nvBufSurface->surfaceList->mappedAddr.addr[0];
         cv::Mat imgbuf1(iSensorMode->getResolution().height(), iSensorMode->getResolution().width(), CV_8UC4, pdata1);
 
         // Convert color from RGBA to BGR
-        cv::Mat display_img(iSensorMode->getResolution().height(), iSensorMode->getResolution().width(), CV_8UC3);
+        cv::Mat display_img;
         cv::cvtColor(imgbuf1, display_img, cv::COLOR_RGBA2BGR);
 
-        image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(display_img));
+        image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(imgbuf1));
 
         // Unmap the buffer memory
-        if (NvBufSurfaceUnMap(nvBufSurface, -1, 0) != 0) {
-            std::cerr << "Failed to unmap NvBufSurface" << std::endl;
+        if (NvBufSurfaceUnMap(nvBufSurface, 0, 0) != 0) {
+            yCError(ARGUS_CAMERA)<<"Failed to unmap NvBufSurface";
         }
 
+        if (NvBufSurfaceDestroy(nvBufSurface) != 0) {
+            yCError(ARGUS_CAMERA)<<"Failed to free the NvBufSurface";
+        }
+        
         // memcpy((void*)image.getRawImage(), (uint8_t*)img_interface->mapBuffer(), img_interface->getBufferSize());
     }
 
