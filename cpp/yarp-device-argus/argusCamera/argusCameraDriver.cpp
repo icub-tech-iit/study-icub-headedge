@@ -40,17 +40,17 @@ static const std::vector<cameraFeature_id_t> supported_features{YARP_FEATURE_BRI
                                                                 // YARP_FEATURE_GAMMA, // it seems not writable
                                                                 YARP_FEATURE_GAIN,
                                                                 // YARP_FEATURE_TRIGGER, // not sure how to use it
-                                                                YARP_FEATURE_FRAME_RATE};
+                                                                YARP_FEATURE_FRAME_RATE, YARP_FEATURE_HUE, YARP_FEATURE_FOCUS};
 
 static const std::vector<cameraFeature_id_t> features_with_auto{YARP_FEATURE_EXPOSURE, YARP_FEATURE_WHITE_BALANCE, YARP_FEATURE_GAIN};
 
 // Values taken from the balser documentation for IMX415-C FIXME! TO BE CHECKED!
-static const std::map<cameraFeature_id_t, std::pair<double, double>> featureMinMax{{YARP_FEATURE_BRIGHTNESS, {-1.0, 1.0}},
-                                                                                   {YARP_FEATURE_EXPOSURE, {68.0, 2300000.0}}, //-10,10, -10,10
-                                                                                   {YARP_FEATURE_SHARPNESS, {0.0, 1.0}},
-                                                                                   {YARP_FEATURE_WHITE_BALANCE, {1.0, 8.0}},  // not sure about it, the doc is not clear, found empirically
+static const std::map<cameraFeature_id_t, std::pair<double, double>> featureMinMax{{YARP_FEATURE_BRIGHTNESS, {-1.0, 1.0}}, //not supported (?)
+                                                                                   {YARP_FEATURE_EXPOSURE, {-2.0, 2.0}}, //fixed
+                                                                                   {YARP_FEATURE_SHARPNESS, {0.0, 1.0}}, //not supported (?)
+                                                                                   {YARP_FEATURE_WHITE_BALANCE, {0.0, 1.0}},  //fixed // not sure about it, the doc is not clear, found empirically
                                                                                    //{YARP_FEATURE_GAMMA, {0.0, 4.0}},
-                                                                                   {YARP_FEATURE_GAIN, {0.0, 33.06}}}; //1,3981.07, 1,3981.07
+                                                                                   {YARP_FEATURE_GAIN, {1.0, 3981.07}}}; //fixed
 
 static const std::map<double, NV::Rotation> rotationToNVRot{{0.0, NV::ROTATION_0}, {90.0, NV::ROTATION_90}, {-90.0, NV::ROTATION_270}, {180.0, NV::ROTATION_180}};
 
@@ -68,11 +68,14 @@ double fromRangeToZeroOne(cameraFeature_id_t feature, double value)
 
 bool argusCameraDriver::setFramerate(const float _fps)
 {
-    auto res = setOption("AcquisitionFrameRate", _fps);
+    // auto res = setOption("AcquisitionFrameRate", _fps);
+    bool res = true;
     if (res)
     {
         m_fps = _fps;
     }
+    yCDebug(ARGUS_CAMERA) << "fps setFramerate" << m_fps;
+
     return res;
 }
 
@@ -110,18 +113,11 @@ bool argusCameraDriver::open(Searchable& config)
         return false;
     }
 
-    if (m_rotation_with_crop)
-    {
-        if (m_rotation == -90.0 || m_rotation == 90.0)
-        {
-            std::swap(m_width, m_height);
-        }
-        yCDebug(ARGUS_CAMERA) << "Rotation with crop";
-    }
-
     if (m_period != 0.0)
     {
-        m_fps = 1.0 / m_period;  // the fps has to be aligned with the nws period
+        // m_fps = 1.0 / m_period;  // the fps has to be aligned with the nws period
+
+        m_fps = 60.0;
         // FIXME set_framerate
     }
 
@@ -139,7 +135,7 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "No cameras available";
     }
 
-    ICameraProperties *iCameraProperties = interface_cast<ICameraProperties>(m_cameraDevices[0]);
+    ICameraProperties *iCameraProperties = interface_cast<ICameraProperties>(m_cameraDevices[m_d]);
     if (!iCameraProperties)
     {
         yCError(ARGUS_CAMERA) << "Failed to get ICameraProperties interface";
@@ -151,29 +147,34 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "Failed to get sensor modes";
     }
     
+    if (m_d >= m_cameraDevices.size())
+    {
+        yCError(ARGUS_CAMERA) << "Camera device index d =" << m_d << "is invalid.";
+    }
+
     /* Create the capture session using the first device and get the core interface */
-    m_captureSession.reset(iCameraProvider->createCaptureSession(m_cameraDevices[0]));
+    m_captureSession.reset(iCameraProvider->createCaptureSession(m_cameraDevices[m_d]));
     ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
     if (!iCaptureSession)
     {
         yCError(ARGUS_CAMERA) << "Failed to get ICaptureSession interface";
     }
 
-    UniqueObj<OutputStreamSettings> streamSettings(iCaptureSession->createOutputStreamSettings(STREAM_TYPE_EGL));
-    IEGLOutputStreamSettings *iEglStreamSettings = interface_cast<IEGLOutputStreamSettings>(streamSettings);
+    m_streamSettings.reset(iCaptureSession->createOutputStreamSettings(STREAM_TYPE_EGL));
+    IEGLOutputStreamSettings *iEglStreamSettings = interface_cast<IEGLOutputStreamSettings>(m_streamSettings);
     if (!iEglStreamSettings)
     {
         yCError(ARGUS_CAMERA) << "Failed to get IEGLOutputStreamSettings interface";
     }
 
     iSensorMode = interface_cast<ISensorMode>(sensorModes[0]);
-    m_width = iSensorMode->getResolution().width(); 
-    m_height = iSensorMode->getResolution().height();
+    // m_width = iSensorMode->getResolution().width(); 
+    // m_height = iSensorMode->getResolution().height();
     Size2D<uint32_t> resolution{m_width, m_height};
     iEglStreamSettings->setPixelFormat(PIXEL_FMT_YCbCr_420_888);
     iEglStreamSettings->setResolution(resolution);
 
-    m_stream.reset(iCaptureSession->createOutputStream(streamSettings.get()));
+    m_stream.reset(iCaptureSession->createOutputStream(m_streamSettings.get()));
     m_consumer.reset(FrameConsumer::create(m_stream.get()));
 
     if (!m_consumer)
@@ -188,8 +189,23 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "Failed to enable output stream";
     }
 
+    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+    if (!iSourceSettings)
+    {
+        yCError(ARGUS_CAMERA) << "Failed to get ISourceSettings interface";
+    }
+
     iCaptureSession->repeat(m_request.get());
 
+    ok = ok && setRgbResolution(m_width, m_height);
+    ok = ok && setFramerate(m_fps);
+
+    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    yDebug() << "r:" << iAutoControlSettings->getWbGains().r();
+    yDebug() << "b:" << iAutoControlSettings->getWbGains().b();
+    yDebug() << "g odd:" << iAutoControlSettings->getWbGains().gOdd();
+    yDebug() << "g even:" << iAutoControlSettings->getWbGains().gEven();
+    yDebug() <<  "saturation"<< iAutoControlSettings->getColorSaturation();
     return ok && startCamera();
 }
 
@@ -223,15 +239,22 @@ bool argusCameraDriver::getRgbResolution(int& width, int& height)
 
 bool argusCameraDriver::setRgbResolution(int width, int height)
 {
-    bool res = false;
-    if (width > 0 && height > 0)
+    // bool res = false;
+    // if (width > 0 && height > 0)
+    // {
+    //     // FIXME change the resolution
+    //     if (res)
+    //     {
+    //         m_width = width;
+    //         m_height = height;
+    //     }
+    // }
+
+    bool res = true;
+    if (res)
     {
-        // FIXME change the resolution
-        if (res)
-        {
-            m_width = width;
-            m_height = height;
-        }
+        m_width = width;
+        m_height = height;
     }
     return res;
 }
@@ -296,13 +319,23 @@ bool argusCameraDriver::setFeature(int feature, double value)
     }
     b = false;
     auto f = static_cast<cameraFeature_id_t>(feature);
+
+    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
+    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
+    iCaptureSession->stopRepeat();
+
     switch (f)
     {
         case YARP_FEATURE_BRIGHTNESS:
             //FIXME
             break;
         case YARP_FEATURE_EXPOSURE:
-            //FIXME
+            // iSourceSettings->setExposureTimeRange(fromZeroOneToRange(f, value));
+            iAutoControlSettings->setExposureCompensation(fromZeroOneToRange(f, value));
+            yDebug() << "exposure value:" << fromZeroOneToRange(f, value);
+            b = true;
             break;
         case YARP_FEATURE_SHARPNESS:
             //FIXME
@@ -312,14 +345,18 @@ bool argusCameraDriver::setFeature(int feature, double value)
             break;
         case YARP_FEATURE_GAIN:
             //FIXME
+            iSourceSettings->setGainRange(fromZeroOneToRange(f, value));
             break;
         case YARP_FEATURE_FRAME_RATE:
-            //FIXME
+            b = setFramerate(value);
+            yCDebug(ARGUS_CAMERA) << "fps setFeature" << value;
             break;
         default:
             yCError(ARGUS_CAMERA) << "Feature not supported!";
             return false;
     }
+
+    iCaptureSession->repeat(m_request.get());
 
     return b;
 }
@@ -334,6 +371,11 @@ bool argusCameraDriver::getFeature(int feature, double* value)
     }
     b = false;
     auto f = static_cast<cameraFeature_id_t>(feature);
+
+    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
+    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+
     switch (f)
     {
         case YARP_FEATURE_BRIGHTNESS:
@@ -341,16 +383,22 @@ bool argusCameraDriver::getFeature(int feature, double* value)
             break;
         case YARP_FEATURE_EXPOSURE:
             //FIXME
+            // b = true;
+            // *value = iSourceSettings->getExposureTimeRange().min();
+            *value = iAutoControlSettings->getExposureCompensation();
+            yDebug() << "get exposure value" << *value;
+            b = true;
             break;
         case YARP_FEATURE_SHARPNESS:
             //FIXME
             break;
         case YARP_FEATURE_WHITE_BALANCE:
-            b = false;
             //FIXME
             break;
         case YARP_FEATURE_GAIN:
             //FIXME
+            *value = iSourceSettings->getGainRange().min();
+            b = true;
             break;
         case YARP_FEATURE_FRAME_RATE:
             b = true;
@@ -370,6 +418,12 @@ bool argusCameraDriver::setFeature(int feature, double value1, double value2)
 {
     auto f = static_cast<cameraFeature_id_t>(feature);
     auto res = true;
+    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
+    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
+    iCaptureSession->stopRepeat();
+
     if (f != YARP_FEATURE_WHITE_BALANCE)
     {
         yCError(ARGUS_CAMERA) << YARP_FEATURE_WHITE_BALANCE << "is not a 2-values feature supported";
@@ -377,6 +431,12 @@ bool argusCameraDriver::setFeature(int feature, double value1, double value2)
     }
 
     //FIXME set the feature
+    // BayerTuple<float> wbGains(value1, iAutoControlSettings->getWbGains().gEven(), iAutoControlSettings->getWbGains().gOdd(), value2);
+    // iAutoControlSettings->setWbGains(wbGains);
+    // yDebug() << fromZeroOneToRange(f, value1);
+
+    iCaptureSession->repeat(m_request.get());
+
     return res;
 }
 
@@ -384,12 +444,22 @@ bool argusCameraDriver::getFeature(int feature, double* value1, double* value2)
 {
     auto f = static_cast<cameraFeature_id_t>(feature);
     auto res = true;
+
+    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
+    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+
     if (f != YARP_FEATURE_WHITE_BALANCE)
     {
         yCError(ARGUS_CAMERA) << "This is not a 2-values feature supported";
         return false;
     }
 
+    // iAutoControlSettings->setAwbMode(AWB_MODE_MANUAL);
+    // *value1 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().r());
+    // *value2 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().b());;
+    // yCDebug(ARGUS_CAMERA) << "In 0-1 r" << *value1;
+    // yCDebug(ARGUS_CAMERA) << "In 0-1 b" << *value2;
     // FIXME
     return res;
 }
@@ -582,6 +652,9 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
     if(iFrame)
     {
         auto img = iFrame->getImage();
+        auto image2d(Argus::interface_cast<EGLStream::IImage2D>(img));
+        m_width = image2d->getSize()[0];
+        m_height = image2d->getSize()[1];
 
         NV::IImageNativeBuffer *iNativeBuffer = interface_cast<NV::IImageNativeBuffer>(img);
         if (!iNativeBuffer)
@@ -590,7 +663,7 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         }
 
         // Create NvBuffer
-        int fd = iNativeBuffer->createNvBuffer(iSensorMode->getResolution(), NVBUF_COLOR_FORMAT_RGBA, NVBUF_LAYOUT_PITCH, rotationToNVRot.at(m_rotation));
+        int fd = iNativeBuffer->createNvBuffer(image2d->getSize(), NVBUF_COLOR_FORMAT_RGBA, NVBUF_LAYOUT_PITCH, rotationToNVRot.at(m_rotation));
         if (fd == -1)
         {
             yCError(ARGUS_CAMERA) << "Failed to create NvBuffer";
@@ -607,7 +680,7 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         }
 
         // Create OpenCV Mat from the buffer
-        cv::Mat rgba_img(iSensorMode->getResolution().height(), iSensorMode->getResolution().width(), CV_8UC4, nvBufSurface->surfaceList->mappedAddr.addr[0]);
+        cv::Mat rgba_img(m_height, m_width, CV_8UC4, nvBufSurface->surfaceList->mappedAddr.addr[0]);
 
         // Convert color from RGBA to BGR
         cv::Mat bgr_img;
