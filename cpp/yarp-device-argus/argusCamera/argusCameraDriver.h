@@ -197,6 +197,6 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     std::vector<Argus::SensorMode*> sensorModes;
     Argus::ISourceSettings *iSourceSettings;
     Argus::IAutoControlSettings *iAutoControlSettings;
-
+    Argus::IEdgeEnhanceSettings *iEdgeEnhanceSettings;
 };
 #endif  // ARGUS_DRIVER_H

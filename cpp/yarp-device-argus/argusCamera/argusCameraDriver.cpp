@@ -36,7 +36,7 @@ using namespace EGLStream;
 // 3 values, 2 is maximum and until now we always used blue and red in this order. Then we ignore
 // green
 
-static const std::vector<cameraFeature_id_t> supported_features{YARP_FEATURE_BRIGHTNESS, YARP_FEATURE_EXPOSURE, YARP_FEATURE_SHARPNESS, YARP_FEATURE_WHITE_BALANCE,
+static const std::vector<cameraFeature_id_t> supported_features{YARP_FEATURE_EXPOSURE, YARP_FEATURE_SATURATION, YARP_FEATURE_SHARPNESS, YARP_FEATURE_WHITE_BALANCE,
                                                                 // YARP_FEATURE_GAMMA, // it seems not writable
                                                                 YARP_FEATURE_GAIN,
                                                                 // YARP_FEATURE_TRIGGER, // not sure how to use it
@@ -45,10 +45,10 @@ static const std::vector<cameraFeature_id_t> supported_features{YARP_FEATURE_BRI
 static const std::vector<cameraFeature_id_t> features_with_auto{YARP_FEATURE_EXPOSURE, YARP_FEATURE_WHITE_BALANCE, YARP_FEATURE_GAIN};
 
 // Values taken from the balser documentation for IMX415-C FIXME! TO BE CHECKED!
-static const std::map<cameraFeature_id_t, std::pair<double, double>> featureMinMax{{YARP_FEATURE_BRIGHTNESS, {-1.0, 1.0}}, //not supported (?)
-                                                                                   {YARP_FEATURE_EXPOSURE, {-2.0, 2.0}}, //fixed
+static const std::map<cameraFeature_id_t, std::pair<double, double>> featureMinMax{{YARP_FEATURE_EXPOSURE, {-2.0, 2.0}}, //fixed
+                                                                                   {YARP_FEATURE_SATURATION, {0.0, 2.0}}, //fixed
                                                                                    {YARP_FEATURE_SHARPNESS, {0.0, 1.0}}, //not supported (?)
-                                                                                   {YARP_FEATURE_WHITE_BALANCE, {0.0, 1.0}},  //fixed // not sure about it, the doc is not clear, found empirically
+                                                                                   {YARP_FEATURE_WHITE_BALANCE, {1.0, 8.0}},  //fixed // not sure about it, the doc is not clear, found empirically
                                                                                    //{YARP_FEATURE_GAMMA, {0.0, 4.0}},
                                                                                    {YARP_FEATURE_GAIN, {1.0, 3981.07}}}; //fixed
 
@@ -200,12 +200,12 @@ bool argusCameraDriver::open(Searchable& config)
     ok = ok && setRgbResolution(m_width, m_height);
     ok = ok && setFramerate(m_fps);
 
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
-    yDebug() << "r:" << iAutoControlSettings->getWbGains().r();
-    yDebug() << "b:" << iAutoControlSettings->getWbGains().b();
-    yDebug() << "g odd:" << iAutoControlSettings->getWbGains().gOdd();
-    yDebug() << "g even:" << iAutoControlSettings->getWbGains().gEven();
-    yDebug() <<  "saturation"<< iAutoControlSettings->getColorSaturation();
+    // IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    // yDebug() << "r:" << iAutoControlSettings->getWbGains().r();
+    // yDebug() << "b:" << iAutoControlSettings->getWbGains().b();
+    // yDebug() << "g odd:" << iAutoControlSettings->getWbGains().gOdd();
+    // yDebug() << "g even:" << iAutoControlSettings->getWbGains().gEven();
+    // yDebug() <<  "saturation"<< iAutoControlSettings->getColorSaturation();
     return ok && startCamera();
 }
 
@@ -321,28 +321,29 @@ bool argusCameraDriver::setFeature(int feature, double value)
     auto f = static_cast<cameraFeature_id_t>(feature);
 
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
     IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    IEdgeEnhanceSettings *iEdgeEnhanceSettings = interface_cast<IEdgeEnhanceSettings>(m_request);
     ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
     iCaptureSession->stopRepeat();
 
     switch (f)
     {
-        case YARP_FEATURE_BRIGHTNESS:
-            //FIXME
-            break;
         case YARP_FEATURE_EXPOSURE:
-            // iSourceSettings->setExposureTimeRange(fromZeroOneToRange(f, value));
             iAutoControlSettings->setExposureCompensation(fromZeroOneToRange(f, value));
-            yDebug() << "exposure value:" << fromZeroOneToRange(f, value);
+            b = true;
+            break;
+        case YARP_FEATURE_SATURATION:
+            iAutoControlSettings->setColorSaturation(fromZeroOneToRange(f, value));
             b = true;
             break;
         case YARP_FEATURE_SHARPNESS:
-            //FIXME
+            iEdgeEnhanceSettings->setEdgeEnhanceMode(EDGE_ENHANCE_MODE_HIGH_QUALITY);
+            iEdgeEnhanceSettings->setEdgeEnhanceStrength(fromZeroOneToRange(f, value));
+            b = true;
             break;
         case YARP_FEATURE_WHITE_BALANCE:
-            //FIXME
-            break;
+            b = false;
+            yCError(PYLON_CAMERA) << "White balance require 2 values";
         case YARP_FEATURE_GAIN:
             //FIXME
             iSourceSettings->setGainRange(fromZeroOneToRange(f, value));
@@ -357,7 +358,6 @@ bool argusCameraDriver::setFeature(int feature, double value)
     }
 
     iCaptureSession->repeat(m_request.get());
-
     return b;
 }
 
@@ -373,32 +373,32 @@ bool argusCameraDriver::getFeature(int feature, double* value)
     auto f = static_cast<cameraFeature_id_t>(feature);
 
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
     IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    IEdgeEnhanceSettings *iEdgeEnhanceSettings = interface_cast<IEdgeEnhanceSettings>(m_request);
 
     switch (f)
     {
-        case YARP_FEATURE_BRIGHTNESS:
-            //FIXME
-            break;
         case YARP_FEATURE_EXPOSURE:
-            //FIXME
-            // b = true;
-            // *value = iSourceSettings->getExposureTimeRange().min();
             *value = iAutoControlSettings->getExposureCompensation();
-            yDebug() << "get exposure value" << *value;
+            b = true;
+            break;
+        case YARP_FEATURE_SATURATION:
+            iAutoControlSettings->setColorSaturationEnable(true);
+            *value = iAutoControlSettings->getColorSaturation();
             b = true;
             break;
         case YARP_FEATURE_SHARPNESS:
-            //FIXME
+            *value = iEdgeEnhanceSettings->getEdgeEnhanceStrength();
+            b = true;
             break;
         case YARP_FEATURE_WHITE_BALANCE:
-            //FIXME
+            b = false;
+            yCError(PYLON_CAMERA) << "White balance is a 2-values feature";
             break;
         case YARP_FEATURE_GAIN:
             //FIXME
-            *value = iSourceSettings->getGainRange().min();
-            b = true;
+            // *value = iSourceSettings->getGainRange().min();
+            // b = true;
             break;
         case YARP_FEATURE_FRAME_RATE:
             b = true;
@@ -418,9 +418,9 @@ bool argusCameraDriver::setFeature(int feature, double value1, double value2)
 {
     auto f = static_cast<cameraFeature_id_t>(feature);
     auto res = true;
-    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    // Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
+    // ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+    // IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
     ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
     iCaptureSession->stopRepeat();
 
@@ -431,10 +431,10 @@ bool argusCameraDriver::setFeature(int feature, double value1, double value2)
     }
 
     //FIXME set the feature
-    // BayerTuple<float> wbGains(value1, iAutoControlSettings->getWbGains().gEven(), iAutoControlSettings->getWbGains().gOdd(), value2);
+    // BayerTuple<float> wbGains;
+    // BayerTuple<float> wbGains(value1, 1.0f, 1.0f, value2);
     // iAutoControlSettings->setWbGains(wbGains);
-    // yDebug() << fromZeroOneToRange(f, value1);
-
+    // iAutoControlSettings->setAwbMode(AWB_MODE_MANUAL);
     iCaptureSession->repeat(m_request.get());
 
     return res;
@@ -445,9 +445,9 @@ bool argusCameraDriver::getFeature(int feature, double* value1, double* value2)
     auto f = static_cast<cameraFeature_id_t>(feature);
     auto res = true;
 
-    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    // Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
+    // ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+    // IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
 
     if (f != YARP_FEATURE_WHITE_BALANCE)
     {
@@ -455,7 +455,6 @@ bool argusCameraDriver::getFeature(int feature, double* value1, double* value2)
         return false;
     }
 
-    // iAutoControlSettings->setAwbMode(AWB_MODE_MANUAL);
     // *value1 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().r());
     // *value2 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().b());;
     // yCDebug(ARGUS_CAMERA) << "In 0-1 r" << *value1;
@@ -492,6 +491,8 @@ bool argusCameraDriver::setActive(int feature, bool onoff)
         case YARP_FEATURE_EXPOSURE:
             //FIXME
             break;
+        // case YARP_FEATURE_SATURATION:
+        //     break;
         case YARP_FEATURE_WHITE_BALANCE:
             //FIXME
             break;
@@ -528,6 +529,8 @@ bool argusCameraDriver::getActive(int feature, bool* isActive)
         case YARP_FEATURE_EXPOSURE:
             //FIXME
             break;
+        // case YARP_FEATURE_SATURATION:
+        //     break;
         case YARP_FEATURE_WHITE_BALANCE:
             //FIXME
             break;
