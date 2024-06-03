@@ -126,6 +126,7 @@ bool argusCameraDriver::open(Searchable& config)
     if (!iCameraProvider)
     {
         yCError(ARGUS_CAMERA) << "Failed to create CameraProvider";
+        return false;
     }
 
     /* Get the camera devices */
@@ -133,23 +134,27 @@ bool argusCameraDriver::open(Searchable& config)
     if (m_cameraDevices.size() == 0)
     {
         yCError(ARGUS_CAMERA) << "No cameras available";
+        return false;
     }
 
     ICameraProperties *iCameraProperties = interface_cast<ICameraProperties>(m_cameraDevices[m_d]);
     if (!iCameraProperties)
     {
         yCError(ARGUS_CAMERA) << "Failed to get ICameraProperties interface";
+        return false;
     }
 
     iCameraProperties->getBasicSensorModes(&sensorModes);
     if (sensorModes.size() == 0)
     {
         yCError(ARGUS_CAMERA) << "Failed to get sensor modes";
+        return false;
     }
     
     if (m_d >= m_cameraDevices.size())
     {
         yCError(ARGUS_CAMERA) << "Camera device index d =" << m_d << "is invalid.";
+        return false;
     }
 
     /* Create the capture session using the first device and get the core interface */
@@ -158,6 +163,7 @@ bool argusCameraDriver::open(Searchable& config)
     if (!iCaptureSession)
     {
         yCError(ARGUS_CAMERA) << "Failed to get ICaptureSession interface";
+        return false;
     }
 
     m_streamSettings.reset(iCaptureSession->createOutputStreamSettings(STREAM_TYPE_EGL));
@@ -165,12 +171,41 @@ bool argusCameraDriver::open(Searchable& config)
     if (!iEglStreamSettings)
     {
         yCError(ARGUS_CAMERA) << "Failed to get IEGLOutputStreamSettings interface";
+        return false;
     }
 
-    iSensorMode = interface_cast<ISensorMode>(sensorModes[0]);
-    // m_width = iSensorMode->getResolution().width(); 
-    // m_height = iSensorMode->getResolution().height();
-    Size2D<uint32_t> resolution{m_width, m_height};
+    int nearestWidth = -1;
+    int nearestHeight = -1;
+    double minDistance = std::numeric_limits<double>::max();
+
+    for (int sensorMode = 0; sensorMode < sensorModes.size() -1; sensorMode++) //FIXME for IMX415 1276x720 is zoomed-in
+    {
+        iSensorMode = interface_cast<ISensorMode>(sensorModes[sensorMode]);
+        if (iSensorMode->getResolution().width() == m_width && iSensorMode->getResolution().height() == m_height)
+        {
+            yCDebug(ARGUS_CAMERA) << "The required resolution" << iSensorMode->getResolution().width() << "x" << iSensorMode->getResolution().height() << "is available";
+            continue;
+        }
+
+        else
+        {
+            yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Setting the nearest resolution...";
+            double distance = std::abs(int(iSensorMode->getResolution().width() - m_width)) + std::abs(int(iSensorMode->getResolution().height() - m_height));
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                nearestWidth = iSensorMode->getResolution().width();
+                nearestHeight = iSensorMode->getResolution().height();
+            }
+        }
+    }
+
+    if (nearestWidth != -1 && nearestHeight != -1)
+    {
+        yCWarning(ARGUS_CAMERA) << "Nearest resolution found:" << nearestWidth << "x" << nearestHeight;
+    }
+
+    Size2D<uint32_t> resolution{nearestWidth, nearestHeight};
     iEglStreamSettings->setPixelFormat(PIXEL_FMT_YCbCr_420_888);
     iEglStreamSettings->setResolution(resolution);
 
@@ -180,6 +215,7 @@ bool argusCameraDriver::open(Searchable& config)
     if (!m_consumer)
     {
         yCError(ARGUS_CAMERA) << "Failed to create FrameConsumer";
+        return false;
     }
 
     m_request.reset(iCaptureSession->createRequest(Argus::CAPTURE_INTENT_PREVIEW));
@@ -187,25 +223,20 @@ bool argusCameraDriver::open(Searchable& config)
     if (iRequest->enableOutputStream(m_stream.get()) != STATUS_OK)
     {
         yCError(ARGUS_CAMERA) << "Failed to enable output stream";
+        return false;
     }
 
     ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
     if (!iSourceSettings)
     {
         yCError(ARGUS_CAMERA) << "Failed to get ISourceSettings interface";
+        return false;
     }
 
     iCaptureSession->repeat(m_request.get());
 
-    ok = ok && setRgbResolution(m_width, m_height);
     ok = ok && setFramerate(m_fps);
 
-    // IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
-    // yDebug() << "r:" << iAutoControlSettings->getWbGains().r();
-    // yDebug() << "b:" << iAutoControlSettings->getWbGains().b();
-    // yDebug() << "g odd:" << iAutoControlSettings->getWbGains().gOdd();
-    // yDebug() << "g even:" << iAutoControlSettings->getWbGains().gEven();
-    // yDebug() <<  "saturation"<< iAutoControlSettings->getColorSaturation();
     return ok && startCamera();
 }
 
@@ -343,7 +374,7 @@ bool argusCameraDriver::setFeature(int feature, double value)
             break;
         case YARP_FEATURE_WHITE_BALANCE:
             b = false;
-            yCError(PYLON_CAMERA) << "White balance require 2 values";
+            yCError(ARGUS_CAMERA) << "White balance require 2 values";
         case YARP_FEATURE_GAIN:
             //FIXME
             iSourceSettings->setGainRange(fromZeroOneToRange(f, value));
@@ -393,7 +424,7 @@ bool argusCameraDriver::getFeature(int feature, double* value)
             break;
         case YARP_FEATURE_WHITE_BALANCE:
             b = false;
-            yCError(PYLON_CAMERA) << "White balance is a 2-values feature";
+            yCError(ARGUS_CAMERA) << "White balance is a 2-values feature";
             break;
         case YARP_FEATURE_GAIN:
             //FIXME
@@ -656,8 +687,10 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
     {
         auto img = iFrame->getImage();
         auto image2d(Argus::interface_cast<EGLStream::IImage2D>(img));
-        m_width = image2d->getSize()[0];
-        m_height = image2d->getSize()[1];
+        auto width = image2d->getSize()[0];
+        auto height = image2d->getSize()[1];
+
+        image.resize(m_width, m_height);
 
         NV::IImageNativeBuffer *iNativeBuffer = interface_cast<NV::IImageNativeBuffer>(img);
         if (!iNativeBuffer)
@@ -670,28 +703,41 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         if (fd == -1)
         {
             yCError(ARGUS_CAMERA) << "Failed to create NvBuffer";
+            return false;
         }
 
         if (NvBufSurfaceFromFd(fd, (void**)(&nvBufSurface)) == -1)
         {
             yCError(ARGUS_CAMERA) << "Cannot get NvBufSurface from fd";
+            return false;
         }
 
         if (NvBufSurfaceMap(nvBufSurface, 0, 0, NVBUF_MAP_READ) != STATUS_OK)
         {
             yCError(ARGUS_CAMERA) << "Failed to map NvBufSurface";
+            return false;
         }
 
         // Create OpenCV Mat from the buffer
-        cv::Mat rgba_img(m_height, m_width, CV_8UC4, nvBufSurface->surfaceList->mappedAddr.addr[0]);
+        cv::Mat rgba_img(height, width, CV_8UC4, nvBufSurface->surfaceList->mappedAddr.addr[0]);
 
-        // Convert color from RGBA to BGR
+        // // Convert color from RGBA to BGR
         cv::Mat bgr_img;
         cv::cvtColor(rgba_img, bgr_img, cv::COLOR_RGBA2BGR);
         
-        image.resize(m_width, m_height);
-        image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(bgr_img));
+        if (m_width != width || m_height != height)
+        {
+            cv::Mat resize_img;
+            cv::Size size(m_width, m_height);
+            cv::resize(bgr_img, resize_img, size);
+            image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(resize_img));
+        }
 
+        else
+        {
+            image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(bgr_img));
+        }
+        
         // Unmap the buffer memory
         if (NvBufSurfaceUnMap(nvBufSurface, 0, 0) != STATUS_OK) 
         {
