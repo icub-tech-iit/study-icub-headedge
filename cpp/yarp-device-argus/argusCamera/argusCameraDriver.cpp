@@ -88,7 +88,7 @@ bool parseUint32Param(std::string param_name, std::uint32_t& param, yarp::os::Se
     }
     else
     {
-        yCWarning(ARGUS_CAMERA) << param_name << "parameter not specifie, using" << param;
+        yCWarning(ARGUS_CAMERA) << param_name << "parameter not specified, using" << param;
         return false;
     }
 }
@@ -178,18 +178,20 @@ bool argusCameraDriver::open(Searchable& config)
     int nearestHeight = -1;
     double minDistance = std::numeric_limits<double>::max();
 
-    for (int sensorMode = 0; sensorMode < sensorModes.size() -1; sensorMode++) //FIXME for IMX415 1276x720 is zoomed-in
+    for (int sensorMode = 0; sensorMode < sensorModes.size() -1; sensorMode++) //FIXME for IMX415 1296x720 is zoomed-in
     {
         iSensorMode = interface_cast<ISensorMode>(sensorModes[sensorMode]);
         if (iSensorMode->getResolution().width() == m_width && iSensorMode->getResolution().height() == m_height)
         {
             yCDebug(ARGUS_CAMERA) << "The required resolution" << iSensorMode->getResolution().width() << "x" << iSensorMode->getResolution().height() << "is available";
-            continue;
+            nearestWidth = m_width;
+            nearestHeight = m_height;
+            break;
         }
 
         else
         {
-            yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Setting the nearest resolution...";
+            yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Searching for the nearest resolution...";
             double distance = std::abs(int(iSensorMode->getResolution().width() - m_width)) + std::abs(int(iSensorMode->getResolution().height() - m_height));
             if (distance < minDistance)
             {
@@ -203,6 +205,15 @@ bool argusCameraDriver::open(Searchable& config)
     if (nearestWidth != -1 && nearestHeight != -1)
     {
         yCWarning(ARGUS_CAMERA) << "Nearest resolution found:" << nearestWidth << "x" << nearestHeight;
+    }
+
+    if (m_rotation_with_crop) 
+    {
+        if (m_rotation == -90.0 || m_rotation == 90.0)
+        {
+            std::swap(m_width, m_height);
+        }
+        yCDebug(ARGUS_CAMERA) << "Rotation with crop";
     }
 
     Size2D<uint32_t> resolution{nearestWidth, nearestHeight};
@@ -698,8 +709,15 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
             yCError(ARGUS_CAMERA) << "IImageNativeBuffer not supported by IImage"; 
         }
 
-        // Create NvBuffer
-        int fd = iNativeBuffer->createNvBuffer(image2d->getSize(), NVBUF_COLOR_FORMAT_RGBA, NVBUF_LAYOUT_PITCH, rotationToNVRot.at(m_rotation));
+        double rotation = 0.0;
+
+        if (m_rotation_with_crop)
+        {
+            rotation = m_rotation;
+        }
+
+        int fd = iNativeBuffer->createNvBuffer(image2d->getSize(), NVBUF_COLOR_FORMAT_RGBA, NVBUF_LAYOUT_PITCH, rotationToNVRot.at(rotation));
+        
         if (fd == -1)
         {
             yCError(ARGUS_CAMERA) << "Failed to create NvBuffer";
@@ -718,12 +736,14 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
             return false;
         }
 
-        // Create OpenCV Mat from the buffer
         cv::Mat rgba_img(height, width, CV_8UC4, nvBufSurface->surfaceList->mappedAddr.addr[0]);
-
-        // // Convert color from RGBA to BGR
         cv::Mat bgr_img;
         cv::cvtColor(rgba_img, bgr_img, cv::COLOR_RGBA2BGR);
+
+        if (!m_rotation_with_crop)
+        {
+            cv::warpAffine(bgr_img, bgr_img, cv::getRotationMatrix2D(cv::Point(m_width/2, m_height/2), m_rotation, 1.0), bgr_img.size());
+        }
         
         if (m_width != width || m_height != height)
         {
@@ -738,7 +758,6 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
             image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(bgr_img));
         }
         
-        // Unmap the buffer memory
         if (NvBufSurfaceUnMap(nvBufSurface, 0, 0) != STATUS_OK) 
         {
             yCError(ARGUS_CAMERA) << "Failed to unmap NvBufSurface";
