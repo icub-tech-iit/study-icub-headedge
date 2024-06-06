@@ -10,6 +10,7 @@
 #define ARGUS_DRIVER_H
 
 #include <Argus/Argus.h>
+#include <Argus/Ext/SyncSensorCalibrationData.h>
 #include <EGLStream/EGLStream.h>
 #include <EGLStream/NV/ImageNativeBuffer.h>
 #include <EGLStream/NV/NvBufSurface.h>
@@ -184,7 +185,7 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     mutable std::string m_lastError{""};
     bool m_verbose{false};
     bool m_initialized{false};
-    float m_fps{30.0};
+    float m_fps{90.0};
 
     Argus::UniqueObj<Argus::CameraProvider> m_cameraProvider;
     Argus::UniqueObj<Argus::OutputStream> m_stream;
