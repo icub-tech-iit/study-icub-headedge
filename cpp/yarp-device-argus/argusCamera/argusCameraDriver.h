@@ -93,7 +93,7 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
    private:
     // method
     // inline bool setParams();
-    bool setFramerate(const float _fps);
+    bool setFramerate(const uint64_t _fps);
     template <class T>
     bool setOption(const std::string& option, T value, bool isEnum = false)
     {
@@ -185,7 +185,8 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     mutable std::string m_lastError{""};
     bool m_verbose{false};
     bool m_initialized{false};
-    float m_fps{90.0};
+    uint64_t m_fps{90};
+    double lastCallTime = 0.0;
 
     Argus::UniqueObj<Argus::CameraProvider> m_cameraProvider;
     Argus::UniqueObj<Argus::OutputStream> m_stream;
