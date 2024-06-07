@@ -50,6 +50,7 @@ static const std::map<cameraFeature_id_t, std::pair<double, double>> featureMinM
                                                                                    {YARP_FEATURE_GAIN, {1.0, 3981.07}}}; //fixed
 
 static const std::map<double, NV::Rotation> rotationToNVRot{{0.0, NV::ROTATION_0}, {90.0, NV::ROTATION_90}, {-90.0, NV::ROTATION_270}, {180.0, NV::ROTATION_180}};
+static const std::map<double, double> rotationToCVRot{{0.0, 0.0}, {90.0, cv::ROTATE_90_COUNTERCLOCKWISE}, {-90.0, cv::ROTATE_90_CLOCKWISE}, {180.0, cv::ROTATE_180}};
 
 // We usually set the features through a range between 0 an 1, we have to translate it in meaninful value for the camera
 double fromZeroOneToRange(cameraFeature_id_t feature, double value)
@@ -63,14 +64,23 @@ double fromRangeToZeroOne(cameraFeature_id_t feature, double value)
     return (value - featureMinMax.at(feature).first) / (featureMinMax.at(feature).second - featureMinMax.at(feature).first);
 }
 
-bool argusCameraDriver::setFramerate(const float _fps)
+bool argusCameraDriver::setFramerate(const uint64_t _fps)
 {
-    // auto res = setOption("AcquisitionFrameRate", _fps);
+    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
+    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+
+    iAutoControlSettings->setAeLock(true);
+    uint64_t frameDuration = 1e9 / m_fps;
+    iSourceSettings->setFrameDurationRange(Argus::Range<uint64_t>(frameDuration));
+    iSourceSettings->setExposureTimeRange(Argus::Range<uint64_t>(frameDuration));
+
     bool res = true;
     if (res)
     {
         m_fps = _fps;
     }
+    
     yCDebug(ARGUS_CAMERA) << "fps setFramerate" << m_fps;
 
     return res;
@@ -121,7 +131,10 @@ bool argusCameraDriver::open(Searchable& config)
     {
         m_fps = 1.0 / m_period;  // the fps has to be aligned with the nws period
         // FIXME set_framerate
+        // m_fps = 60;
     }
+
+    // FIXME handle m_period = 0.0
 
     m_cameraProvider.reset(CameraProvider::create());
     ICameraProvider *iCameraProvider = interface_cast<ICameraProvider>(m_cameraProvider);
@@ -246,9 +259,8 @@ bool argusCameraDriver::open(Searchable& config)
         return false;
     }
 
-    iCaptureSession->repeat(m_request.get());
-
     ok = ok && setFramerate(m_fps);
+    iCaptureSession->repeat(m_request.get());
 
     return ok && startCamera();
 }
@@ -758,22 +770,16 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
 
         if (!m_rotation_with_crop)
         {
-            cv::warpAffine(bgr_img, bgr_img, cv::getRotationMatrix2D(cv::Point(m_width/2, m_height/2), m_rotation, 1.0), bgr_img.size());
-        }
-        
-        if (m_width != width || m_height != height)
-        {
-            cv::Mat resize_img;
-            cv::Size size(m_width, m_height);
-            cv::resize(bgr_img, resize_img, size);
-            image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(resize_img));
-        }
+            cv::rotate(bgr_img, bgr_img, rotationToCVRot.at(m_rotation));
+            // cv::warpAffine(bgr_img, bgr_img, cv::getRotationMatrix2D(cv::Point(m_width/2, m_height/2), m_rotation, 1.0), bgr_img.size());
 
-        else
-        {
-            image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(bgr_img));
         }
         
+        cv::Size size(m_width, m_height);
+        cv::resize(bgr_img, bgr_img, size);
+        
+        image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(bgr_img));
+
         if (NvBufSurfaceUnMap(nvBufSurface, 0, 0) != STATUS_OK) 
         {
             yCError(ARGUS_CAMERA) << "Failed to unmap NvBufSurface";
