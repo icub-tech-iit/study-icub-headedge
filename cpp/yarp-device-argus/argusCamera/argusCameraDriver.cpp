@@ -768,11 +768,11 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         cv::Mat bgr_img;
         cv::cvtColor(rgba_img, bgr_img, cv::COLOR_RGBA2BGR);
 
-        if (!m_rotation_with_crop)
+        if (!m_rotation_with_crop && m_rotation != 0.0)
         {
-            cv::rotate(bgr_img, bgr_img, rotationToCVRot.at(m_rotation));
-            // cv::warpAffine(bgr_img, bgr_img, cv::getRotationMatrix2D(cv::Point(m_width/2, m_height/2), m_rotation, 1.0), bgr_img.size());
-
+            cv::Point2f img_center((bgr_img.cols - 1) / 2.0, (bgr_img.rows - 1) / 2.0);
+            cv::Mat M = cv::getRotationMatrix2D(img_center, m_rotation, 1.0);
+            cv::warpAffine(bgr_img, bgr_img, M, bgr_img.size());
         }
         
         cv::Size size(m_width, m_height);
