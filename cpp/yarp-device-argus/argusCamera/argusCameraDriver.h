@@ -91,102 +91,12 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     int width() const override;
 
    private:
-    // method
-    // inline bool setParams();
     bool setFramerate(const uint64_t _fps);
-    template <class T>
-    bool setOption(const std::string& option, T value, bool isEnum = false)
-    {
-        std::lock_guard<std::mutex> guard(m_mutex);
-        // in some cases it is not used, suppressing the warning
-        YARP_UNUSED(isEnum);
-        bool ok{true};
-        stopCamera();
-        yCDebug(ARGUS_CAMERA) << "Setting " << option << "to" << value;
-        if constexpr (std::is_same<T, float>::value || std::is_same<T, double>::value)
-        {
-            // FIXME
-        }
-        else if constexpr (std::is_same<T, bool>::value)
-        {
-            // FIXME
-        }
-        else if constexpr (std::is_same<T, int>::value)
-        {
-            // FIXME
-        }
-        else if constexpr (std::is_same<T, const char*>::value)
-        {
-            if (isEnum)
-            {
-                // FIXME
-            }
-            else
-            {
-                // FIXME
-            }
-        }
-        else
-        {
-            yCError(ARGUS_CAMERA) << "Option" << option << "has a type not supported, type" << typeid(T).name();
-            startCamera();
-            return false;
-            }
-        return startCamera() && ok;
-    }
-
-    template <class T>
-    bool getOption(const std::string& option, T& value, bool isEnum = false)
-    {
-        // in some cases it is not used, suppressing the warning
-        YARP_UNUSED(isEnum);
-        if constexpr (std::is_same<T, float*>::value || std::is_same<T, double*>::value)
-        {
-            // FIXME
-            yCDebug(ARGUS_CAMERA) << "Getting" << option << "value:" << *value;
-        }
-        else if constexpr (std::is_same<T, bool*>::value)
-        {
-            // FIXME
-            yCDebug(ARGUS_CAMERA) << "Getting" << option << "value:" << *value;
-        }
-        else if constexpr (std::is_same<T, int*>::value)
-        {
-            // FIXME
-            yCDebug(ARGUS_CAMERA) << "Getting" << option << "value:" << *value;
-        }
-        else if constexpr (std::is_same<T, std::string>::value)
-        {
-            if (isEnum)
-            {
-                // FIXME
-                yCDebug(ARGUS_CAMERA) << "Getting" << option << "value:" << value;
-            }
-            else
-            {
-                // FIXME
-                yCDebug(ARGUS_CAMERA) << "Getting" << option << "value:" << value;
-            }
-        }
-        else
-        {
-            yCError(ARGUS_CAMERA) << "Option" << option << "has a type not supported, type" << typeid(T).name();
-            return false;
-        }
-        return true;
-    }
-
     bool startCamera();
     bool stopCamera();
 
     mutable std::mutex m_mutex;
-
-    yarp::os::Stamp m_rgb_stamp;
-    mutable std::string m_lastError{""};
-    bool m_verbose{false};
-    bool m_initialized{false};
     uint64_t m_fps{90};
-    double lastCallTime = 0.0;
 
     Argus::UniqueObj<Argus::CameraProvider> m_cameraProvider;
     Argus::UniqueObj<Argus::OutputStream> m_stream;
@@ -195,8 +105,8 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     Argus::UniqueObj<Argus::CaptureSession> m_captureSession;
     Argus::UniqueObj<EGLStream::FrameConsumer> m_consumer;
     std::vector<Argus::CameraDevice*> m_cameraDevices;
-    Argus::ISensorMode *iSensorMode;
     std::vector<Argus::SensorMode*> sensorModes;
+    Argus::ISensorMode *iSensorMode;
     Argus::ISourceSettings *iSourceSettings;
     Argus::IAutoControlSettings *iAutoControlSettings;
     Argus::IEdgeEnhanceSettings *iEdgeEnhanceSettings;

@@ -8,7 +8,7 @@
 // This is an automatically generated file. Please do not edit it.
 // It will be re-generated if the cmake flag ALLOW_DEVICE_PARAM_PARSER_GERNERATION is ON.
 
-// Generated on: Fri Jun  7 17:02:52 2024
+// Generated on: Mon Jun 10 14:46:33 2024
 
 
 #include "argusCameraDriver_ParamsParser.h"
