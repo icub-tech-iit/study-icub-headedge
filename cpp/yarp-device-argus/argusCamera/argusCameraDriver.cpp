@@ -66,7 +66,7 @@ double fromRangeToZeroOne(cameraFeature_id_t feature, double value)
 
 bool argusCameraDriver::setFramerate(const uint64_t _fps)
 {
-    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
+    IRequest *iRequest = interface_cast<IRequest>(m_request);
     IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
     ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
 
@@ -81,8 +81,6 @@ bool argusCameraDriver::setFramerate(const uint64_t _fps)
         m_fps = _fps;
     }
     
-    yCDebug(ARGUS_CAMERA) << "fps setFramerate" << m_fps;
-
     return res;
 }
 
@@ -129,9 +127,7 @@ bool argusCameraDriver::open(Searchable& config)
 
     if (m_period != 0.0)
     {
-        m_fps = 1.0 / m_period;  // the fps has to be aligned with the nws period
-        // FIXME set_framerate
-        // m_fps = 60;
+        m_fps = 1.0 / m_period;
     }
 
     // FIXME handle m_period = 0.0
@@ -295,18 +291,19 @@ bool argusCameraDriver::getRgbResolution(int& width, int& height)
 
 bool argusCameraDriver::setRgbResolution(int width, int height)
 {
-    bool res = false;
+    IEGLOutputStreamSettings *iEglStreamSettings = interface_cast<IEGLOutputStreamSettings>(m_streamSettings);
+    stopCamera();
     if (width > 0 && height > 0)
     {
         // FIXME change the resolution
-        if (res)
+        if(iEglStreamSettings->setResolution(Size2D<uint32_t>(width, height)) == STATUS_OK)
         {
             m_width = width;
             m_height = height;
         }
     }
-
-    return res;
+    startCamera();
+    return true;
 }
 
 bool argusCameraDriver::setRgbFOV(double horizontalFov, double verticalFov)
@@ -503,10 +500,8 @@ bool argusCameraDriver::getFeature(int feature, double* value1, double* value2)
         return false;
     }
 
-    iAutoControlSettings->setAwbMode(AWB_MODE_AUTO);
     *value1 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().r());
-    *value2 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().b());;
-    // FIXME
+    *value2 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().b());
     return res;
 }
 
@@ -535,25 +530,15 @@ bool argusCameraDriver::setActive(int feature, bool onoff)
         return false;
     }
 
-    std::string val_to_set = onoff ? "true" : "false";
-
     switch (f)
     {
-        //FIXME all the autos feature to be enabled or disabled
         case YARP_FEATURE_EXPOSURE:
-            //FIXME
-            // if(!iAutoControlSettings->getAeLock())
-            // {
-            //     iAutoControlSettings->setAeLock(true);
-            // }
-            // iAutoControlSettings->setAeLock(false);
-            // b = true;
-            yDebug() << "set auto exposure";
+            iAutoControlSettings->setAeLock(!onoff);
+            b = true;
             break;
         case YARP_FEATURE_WHITE_BALANCE:
-            // iAutoControlSettings->setColorSaturationEnable(val_to_set.c_str());
-            // iAutoControlSettings->setColorSaturation(fromZeroOneToRange(f, 0.50));
-            yDebug() << "set auto wb";
+            iAutoControlSettings->setAwbMode(AWB_MODE_AUTO);
+            iAutoControlSettings->setAwbLock(!onoff); //se onoff = true, setAwbLock = false (AE enabled)
             b = true;
             break;
         default:
@@ -583,25 +568,15 @@ bool argusCameraDriver::getActive(int feature, bool* isActive)
         return false;
     }
 
-    std::string val_to_get{""};
+    bool val_to_get;
     switch (f)
     {
         case YARP_FEATURE_EXPOSURE:
-            //FIXME
-            if(!iAutoControlSettings->getAeLock()) //false = auto ae
-            {
-                yDebug() << iAutoControlSettings->getAeLock();
-                val_to_get = "true";
-            }
+            val_to_get = !(iAutoControlSettings->getAeLock());
             b = true;
             break;
         case YARP_FEATURE_WHITE_BALANCE:
-            //FIXME
-            // iAutoControlSettings->setAwbLock(false);
-            // iAutoControlSettings->setAwbMode(AWB_MODE_AUTO);
-            // *value1 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().r());
-            // *value2 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().b());;
-            yDebug() << "get autowb";
+            val_to_get = !(iAutoControlSettings->getAwbLock());
             b = true;
             break;
         default:
@@ -611,12 +586,12 @@ bool argusCameraDriver::getActive(int feature, bool* isActive)
 
     if (b)
     {
-        if (val_to_get == "true")
+        if (val_to_get)
         {
             yDebug() << "is active true";
             *isActive = true;
         }
-        else if (val_to_get == "false")
+        else if (!val_to_get)
         {
             yDebug() << "is active false";
             *isActive = false;
@@ -775,8 +750,11 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
             cv::warpAffine(bgr_img, bgr_img, M, bgr_img.size());
         }
         
-        cv::Size size(m_width, m_height);
-        cv::resize(bgr_img, bgr_img, size);
+        if (m_width != width || m_height != height)
+        {
+            cv::Size size(m_width, m_height);
+            cv::resize(bgr_img, bgr_img, size);
+        }
         
         image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(bgr_img));
 
