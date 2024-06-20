@@ -65,22 +65,22 @@ double fromRangeToZeroOne(cameraFeature_id_t feature, double value)
 
 bool argusCameraDriver::setFramerate(const uint64_t _fps)
 {
+    stopCamera();
     IRequest *iRequest = interface_cast<IRequest>(m_request);
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
-    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+    IAutoControlSettings *m_iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    ISourceSettings *m_iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
 
-    iAutoControlSettings->setAeLock(true);
-    uint64_t frameDuration = 1e9 / m_fps;
-    iSourceSettings->setFrameDurationRange(Argus::Range<uint64_t>(frameDuration));
-    iSourceSettings->setExposureTimeRange(Argus::Range<uint64_t>(frameDuration));
+    m_iAutoControlSettings->setAeLock(true);
 
-    bool res = true;
-    if (res)
+    // According to https://docs.nvidia.com/jetson/l4t-multimedia/classArgus_1_1ISourceSettings.html, frame duration range is expressed in nanoseconds
+    uint64_t frameDuration = 1e9 / _fps;
+    if (m_iSourceSettings->setFrameDurationRange(Argus::Range<uint64_t>(frameDuration)) == STATUS_OK && m_iSourceSettings->setExposureTimeRange(Argus::Range<uint64_t>(frameDuration)) == STATUS_OK)
     {
         m_fps = _fps;
     }
     
-    return res;
+    startCamera();
+    return true;
 }
 
 bool parseUint32Param(std::string param_name, std::uint32_t& param, yarp::os::Searchable& config)
@@ -99,7 +99,6 @@ bool parseUint32Param(std::string param_name, std::uint32_t& param, yarp::os::Se
 
 bool argusCameraDriver::startCamera()
 {
-    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
     ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
     iCaptureSession->repeat(m_request.get());
 
@@ -154,8 +153,8 @@ bool argusCameraDriver::open(Searchable& config)
         return false;
     }
 
-    iCameraProperties->getBasicSensorModes(&sensorModes);
-    if (sensorModes.size() == 0)
+    iCameraProperties->getAllSensorModes(&m_sensorModes);
+    if (m_sensorModes.size() == 0)
     {
         yCError(ARGUS_CAMERA) << "Failed to get sensor modes";
         return false;
@@ -188,33 +187,32 @@ bool argusCameraDriver::open(Searchable& config)
     int nearestHeight = -1;
     double minDistance = std::numeric_limits<double>::max();
 
-    for (int sensorMode = 0; sensorMode < sensorModes.size() -1; sensorMode++) //FIXME for IMX415 1296x720 is zoomed-in
+    for (int sensorMode = 0; sensorMode < m_sensorModes.size(); sensorMode++) //FIXME for IMX415 1296x720 is zoomed-in
     {
-        iSensorMode = interface_cast<ISensorMode>(sensorModes[sensorMode]);
-        if (iSensorMode->getResolution().width() == m_width && iSensorMode->getResolution().height() == m_height)
+        m_iSensorMode = interface_cast<ISensorMode>(m_sensorModes[sensorMode]);
+        if (m_iSensorMode->getResolution().width() == m_width && m_iSensorMode->getResolution().height() == m_height)
         {
-            yCDebug(ARGUS_CAMERA) << "The required resolution" << iSensorMode->getResolution().width() << "x" << iSensorMode->getResolution().height() << "is available";
+            yCDebug(ARGUS_CAMERA) << "The required resolution" << m_iSensorMode->getResolution().width() << "x" << m_iSensorMode->getResolution().height() << "is available";
             nearestWidth = m_width;
             nearestHeight = m_height;
             break;
         }
-
         else
         {
             yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Searching for the nearest resolution...";
-            double distance = std::abs(int(iSensorMode->getResolution().width() - m_width)) + std::abs(int(iSensorMode->getResolution().height() - m_height));
+            double distance = std::abs(int(m_iSensorMode->getResolution().width() - m_width)) + std::abs(int(m_iSensorMode->getResolution().height() - m_height));
             if (distance < minDistance)
             {
                 minDistance = distance;
-                nearestWidth = iSensorMode->getResolution().width();
-                nearestHeight = iSensorMode->getResolution().height();
+                nearestWidth = m_iSensorMode->getResolution().width();
+                nearestHeight = m_iSensorMode->getResolution().height();
             }
         }
     }
 
     if (nearestWidth != -1 && nearestHeight != -1)
     {
-        yCWarning(ARGUS_CAMERA) << "Nearest resolution found:" << nearestWidth << "x" << nearestHeight;
+        yCInfo(ARGUS_CAMERA) << "Nearest resolution found:" << nearestWidth << "x" << nearestHeight;
     }
 
     if (m_rotation_with_crop) 
@@ -223,7 +221,6 @@ bool argusCameraDriver::open(Searchable& config)
         {
             std::swap(m_width, m_height);
         }
-        yCDebug(ARGUS_CAMERA) << "Rotation with crop";
     }
 
     Size2D<uint32_t> resolution{nearestWidth, nearestHeight};
@@ -247,15 +244,14 @@ bool argusCameraDriver::open(Searchable& config)
         return false;
     }
 
-    ISourceSettings *iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
-    if (!iSourceSettings)
+    ISourceSettings *m_iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
+    if (!m_iSourceSettings)
     {
         yCError(ARGUS_CAMERA) << "Failed to get ISourceSettings interface";
         return false;
     }
 
     ok = ok && setFramerate(m_fps);
-    iCaptureSession->repeat(m_request.get());
 
     return ok && startCamera();
 }
@@ -368,23 +364,23 @@ bool argusCameraDriver::setFeature(int feature, double value)
     auto f = static_cast<cameraFeature_id_t>(feature);
 
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
-    IEdgeEnhanceSettings *iEdgeEnhanceSettings = interface_cast<IEdgeEnhanceSettings>(m_request);
+    IAutoControlSettings *m_iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    IEdgeEnhanceSettings *m_iEdgeEnhanceSettings = interface_cast<IEdgeEnhanceSettings>(m_request);
     stopCamera();
 
     switch (f)
     {
         case YARP_FEATURE_EXPOSURE:
-            iAutoControlSettings->setExposureCompensation(fromZeroOneToRange(f, value));
+            m_iAutoControlSettings->setExposureCompensation(fromZeroOneToRange(f, value));
             b = true;
             break;
         case YARP_FEATURE_SATURATION:
-            iAutoControlSettings->setColorSaturation(fromZeroOneToRange(f, value));
+            m_iAutoControlSettings->setColorSaturation(fromZeroOneToRange(f, value));
             b = true;
             break;
         case YARP_FEATURE_SHARPNESS:
-            iEdgeEnhanceSettings->setEdgeEnhanceMode(EDGE_ENHANCE_MODE_HIGH_QUALITY);
-            iEdgeEnhanceSettings->setEdgeEnhanceStrength(fromZeroOneToRange(f, value));
+            m_iEdgeEnhanceSettings->setEdgeEnhanceMode(EDGE_ENHANCE_MODE_HIGH_QUALITY);
+            m_iEdgeEnhanceSettings->setEdgeEnhanceStrength(fromZeroOneToRange(f, value));
             b = true;
             break;
         case YARP_FEATURE_WHITE_BALANCE:
@@ -414,22 +410,22 @@ bool argusCameraDriver::getFeature(int feature, double* value)
     auto f = static_cast<cameraFeature_id_t>(feature);
 
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
-    IEdgeEnhanceSettings *iEdgeEnhanceSettings = interface_cast<IEdgeEnhanceSettings>(m_request);
+    IAutoControlSettings *m_iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    IEdgeEnhanceSettings *m_iEdgeEnhanceSettings = interface_cast<IEdgeEnhanceSettings>(m_request);
 
     switch (f)
     {
         case YARP_FEATURE_EXPOSURE:
-            *value = iAutoControlSettings->getExposureCompensation();
+            *value = m_iAutoControlSettings->getExposureCompensation();
             b = true;
             break;
         case YARP_FEATURE_SATURATION:
-            iAutoControlSettings->setColorSaturationEnable(true);
-            *value = iAutoControlSettings->getColorSaturation();
+            m_iAutoControlSettings->setColorSaturationEnable(true);
+            *value = m_iAutoControlSettings->getColorSaturation();
             b = true;
             break;
         case YARP_FEATURE_SHARPNESS:
-            *value = iEdgeEnhanceSettings->getEdgeEnhanceStrength();
+            *value = m_iEdgeEnhanceSettings->getEdgeEnhanceStrength();
             b = true;
             break;
         case YARP_FEATURE_WHITE_BALANCE:
@@ -455,7 +451,7 @@ bool argusCameraDriver::setFeature(int feature, double value1, double value2)
     auto f = static_cast<cameraFeature_id_t>(feature);
     auto res = true;
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    IAutoControlSettings *m_iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
     stopCamera();
 
     if (f != YARP_FEATURE_WHITE_BALANCE)
@@ -464,11 +460,11 @@ bool argusCameraDriver::setFeature(int feature, double value1, double value2)
         return false;
     }
 
-    iAutoControlSettings->setAeLock(true);
-    iAutoControlSettings->setAwbLock(false);
-    iAutoControlSettings->setAwbMode(AWB_MODE_MANUAL);
+    m_iAutoControlSettings->setAeLock(true);
+    m_iAutoControlSettings->setAwbLock(false);
+    m_iAutoControlSettings->setAwbMode(AWB_MODE_MANUAL);
     BayerTuple<float> wbGains(fromZeroOneToRange(f, value2), fromZeroOneToRange(f, 0.0), fromZeroOneToRange(f, 0.0), fromZeroOneToRange(f, value1));
-    iAutoControlSettings->setWbGains(wbGains);
+    m_iAutoControlSettings->setWbGains(wbGains);
 
     startCamera();
     return res;
@@ -480,7 +476,7 @@ bool argusCameraDriver::getFeature(int feature, double* value1, double* value2)
     auto res = true;
 
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    IAutoControlSettings *m_iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
 
     if (f != YARP_FEATURE_WHITE_BALANCE)
     {
@@ -488,8 +484,8 @@ bool argusCameraDriver::getFeature(int feature, double* value1, double* value2)
         return false;
     }
 
-    *value1 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().r());
-    *value2 = fromRangeToZeroOne(f, iAutoControlSettings->getWbGains().b());
+    *value1 = fromRangeToZeroOne(f, m_iAutoControlSettings->getWbGains().r());
+    *value2 = fromRangeToZeroOne(f, m_iAutoControlSettings->getWbGains().b());
     return res;
 }
 
@@ -503,7 +499,7 @@ bool argusCameraDriver::setActive(int feature, bool onoff)
     bool b = false;
     auto f = static_cast<cameraFeature_id_t>(feature);
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    IAutoControlSettings *m_iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
     stopCamera();
 
     if (!hasFeature(feature, &b) || !b)
@@ -521,12 +517,12 @@ bool argusCameraDriver::setActive(int feature, bool onoff)
     switch (f)
     {
         case YARP_FEATURE_EXPOSURE:
-            iAutoControlSettings->setAeLock(!onoff);
+            m_iAutoControlSettings->setAeLock(!onoff);
             b = true;
             break;
         case YARP_FEATURE_WHITE_BALANCE:
-            iAutoControlSettings->setAwbMode(AWB_MODE_AUTO);
-            iAutoControlSettings->setAwbLock(!onoff);
+            m_iAutoControlSettings->setAwbMode(AWB_MODE_AUTO);
+            m_iAutoControlSettings->setAwbLock(!onoff);
             b = true;
             break;
         default:
@@ -543,7 +539,7 @@ bool argusCameraDriver::getActive(int feature, bool* isActive)
     bool b = false;
     auto f = static_cast<cameraFeature_id_t>(feature);
     Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    IAutoControlSettings *iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
+    IAutoControlSettings *m_iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
     if (!hasFeature(feature, &b) || !b)
     {
         yCError(ARGUS_CAMERA) << "Feature" << feature << "not supported!";
@@ -560,11 +556,11 @@ bool argusCameraDriver::getActive(int feature, bool* isActive)
     switch (f)
     {
         case YARP_FEATURE_EXPOSURE:
-            val_to_get = !(iAutoControlSettings->getAeLock());
+            val_to_get = !(m_iAutoControlSettings->getAeLock());
             b = true;
             break;
         case YARP_FEATURE_WHITE_BALANCE:
-            val_to_get = !(iAutoControlSettings->getAwbLock());
+            val_to_get = !(m_iAutoControlSettings->getAwbLock());
             b = true;
             break;
         default:
@@ -576,12 +572,10 @@ bool argusCameraDriver::getActive(int feature, bool* isActive)
     {
         if (val_to_get)
         {
-            yDebug() << "is active true";
             *isActive = true;
         }
-        else if (!val_to_get)
+        else
         {
-            yDebug() << "is active false";
             *isActive = false;
         }
     }
@@ -692,7 +686,7 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         auto width = image2d->getSize()[0];
         auto height = image2d->getSize()[1];
 
-        image.resize(m_width, m_height);
+        // image.resize(m_width, m_height); to be tested
 
         NV::IImageNativeBuffer *iNativeBuffer = interface_cast<NV::IImageNativeBuffer>(img);
         if (!iNativeBuffer)
@@ -701,9 +695,10 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         }
 
         double rotation = 0.0;
-
         if (m_rotation_with_crop)
         {
+            // If m_rotation_with_crop = true, width and height are swapped and the image is stored in a buffer already rotated by m_rotation.
+            // In this way, no further transformations need to be done with OpenCV.
             rotation = m_rotation;
         }
 

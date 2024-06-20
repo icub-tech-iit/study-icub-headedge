@@ -105,10 +105,10 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     Argus::UniqueObj<Argus::CaptureSession> m_captureSession;
     Argus::UniqueObj<EGLStream::FrameConsumer> m_consumer;
     std::vector<Argus::CameraDevice*> m_cameraDevices;
-    std::vector<Argus::SensorMode*> sensorModes;
-    Argus::ISensorMode *iSensorMode;
-    Argus::ISourceSettings *iSourceSettings;
-    Argus::IAutoControlSettings *iAutoControlSettings;
-    Argus::IEdgeEnhanceSettings *iEdgeEnhanceSettings;
+    std::vector<Argus::SensorMode*> m_sensorModes;
+    Argus::ISensorMode *m_iSensorMode;
+    Argus::ISourceSettings *m_iSourceSettings;
+    Argus::IAutoControlSettings *m_iAutoControlSettings;
+    Argus::IEdgeEnhanceSettings *m_iEdgeEnhanceSettings;
 };
 #endif  // ARGUS_DRIVER_H
