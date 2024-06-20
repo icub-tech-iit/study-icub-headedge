@@ -8,7 +8,7 @@
 // This is an automatically generated file. Please do not edit it.
 // It will be re-generated if the cmake flag ALLOW_DEVICE_PARAM_PARSER_GERNERATION is ON.
 
-// Generated on: Mon Jun 10 14:46:33 2024
+// Generated on: Tue Jun 18 10:02:24 2024
 
 
 #ifndef ARGUSCAMERADRIVER_PARAMSPARSER_H
