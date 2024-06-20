@@ -65,7 +65,6 @@ double fromRangeToZeroOne(cameraFeature_id_t feature, double value)
 
 bool argusCameraDriver::setFramerate(const uint64_t _fps)
 {
-    stopCamera();
     IRequest *iRequest = interface_cast<IRequest>(m_request);
     IAutoControlSettings *m_iAutoControlSettings = interface_cast<IAutoControlSettings>(iRequest->getAutoControlSettings());
     ISourceSettings *m_iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
@@ -74,13 +73,15 @@ bool argusCameraDriver::setFramerate(const uint64_t _fps)
 
     // According to https://docs.nvidia.com/jetson/l4t-multimedia/classArgus_1_1ISourceSettings.html, frame duration range is expressed in nanoseconds
     uint64_t frameDuration = 1e9 / _fps;
-    if (m_iSourceSettings->setFrameDurationRange(Argus::Range<uint64_t>(frameDuration)) == STATUS_OK && m_iSourceSettings->setExposureTimeRange(Argus::Range<uint64_t>(frameDuration)) == STATUS_OK)
+    bool ret = true;
+    ret = ret && m_iSourceSettings->setFrameDurationRange(Argus::Range<uint64_t>(frameDuration)) == STATUS_OK;
+    ret = ret && m_iSourceSettings->setExposureTimeRange(Argus::Range<uint64_t>(frameDuration)) == STATUS_OK;
+    if (ret)
     {
         m_fps = _fps;
     }
     
-    startCamera();
-    return true;
+    return ret;
 }
 
 bool parseUint32Param(std::string param_name, std::uint32_t& param, yarp::os::Searchable& config)
