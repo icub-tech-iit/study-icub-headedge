@@ -37,7 +37,6 @@ using namespace EGLStream;
 // green
 
 static const std::vector<cameraFeature_id_t> supported_features{YARP_FEATURE_EXPOSURE, YARP_FEATURE_SATURATION, YARP_FEATURE_SHARPNESS, YARP_FEATURE_WHITE_BALANCE,
-                                                                YARP_FEATURE_GAIN,
                                                                 YARP_FEATURE_FRAME_RATE};
 
 static const std::vector<cameraFeature_id_t> features_with_auto{YARP_FEATURE_EXPOSURE, YARP_FEATURE_WHITE_BALANCE};
@@ -295,7 +294,6 @@ bool argusCameraDriver::setRgbResolution(int width, int height)
     stopCamera();
     if (width > 0 && height > 0)
     {
-        // FIXME change the resolution
         if(iEglStreamSettings->setResolution(Size2D<uint32_t>(width, height)) == STATUS_OK)
         {
             m_width = width;
@@ -332,7 +330,7 @@ bool argusCameraDriver::setRgbMirroring(bool mirror)
 
 bool argusCameraDriver::getRgbIntrinsicParam(Property& intrinsic)
 {
-    yCWarning(ARGUS_CAMERA) << "getRgbIntrinsicParam not implemented yet"; //no intrinsic parameters stored in the eeprom of the camera
+    yCWarning(ARGUS_CAMERA) << "getRgbIntrinsicParam not supported"; //no intrinsic parameters stored in the eeprom of the camera
     return false;
 }
 
@@ -392,13 +390,8 @@ bool argusCameraDriver::setFeature(int feature, double value)
         case YARP_FEATURE_WHITE_BALANCE:
             b = false;
             yCError(ARGUS_CAMERA) << "White balance require 2 values";
-        case YARP_FEATURE_GAIN:
-            //FIXME
-            // iSourceSettings->setGainRange(fromZeroOneToRange(f, value));
-            break;
         case YARP_FEATURE_FRAME_RATE:
             b = setFramerate(value);
-            yCDebug(ARGUS_CAMERA) << "fps setFeature" << value;
             break;
         default:
             yCError(ARGUS_CAMERA) << "Feature not supported!";
@@ -443,14 +436,9 @@ bool argusCameraDriver::getFeature(int feature, double* value)
             b = false;
             yCError(ARGUS_CAMERA) << "White balance is a 2-values feature";
             break;
-        case YARP_FEATURE_GAIN:
-            //FIXME
-            // *value = iSourceSettings->getGainRange().min();
-            // b = true;
-            break;
         case YARP_FEATURE_FRAME_RATE:
             b = true;
-            //FIXME
+            *value = m_fps;
             break;
         default:
             yCError(ARGUS_CAMERA) << "Feature not supported!";
@@ -538,7 +526,7 @@ bool argusCameraDriver::setActive(int feature, bool onoff)
             break;
         case YARP_FEATURE_WHITE_BALANCE:
             iAutoControlSettings->setAwbMode(AWB_MODE_AUTO);
-            iAutoControlSettings->setAwbLock(!onoff); //se onoff = true, setAwbLock = false (AE enabled)
+            iAutoControlSettings->setAwbLock(!onoff);
             b = true;
             break;
         default:
