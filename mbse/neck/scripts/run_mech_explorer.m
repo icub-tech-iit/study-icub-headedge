@@ -26,7 +26,11 @@ function run_mech_explorer(variant, varargin)
         filename = varargin{2};
     end
     
-    data = load(filename);
+    orig_filename = './cache/voltage.mat';
+    if ~strcmpi(filename, orig_filename)
+        copyfile(filename, orig_filename);
+    end
+    data = load(orig_filename);
     Tend = data.voltage.Time(end);
     
     mdl = 'PlaybackMechExplorer';
