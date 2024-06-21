@@ -26,11 +26,7 @@ function run_mech_explorer(variant, varargin)
         filename = varargin{2};
     end
     
-    orig_filename = './cache/voltage.mat';
-    if ~strcmpi(filename, orig_filename)
-        copyfile(filename, orig_filename);
-    end
-    data = load(orig_filename);
+    data = load(filename);
     Tend = data.voltage.Time(end);
     
     mdl = 'PlaybackMechExplorer';
@@ -42,6 +38,7 @@ function run_mech_explorer(variant, varargin)
     
     Simulink.VariantManager.activateModel(mdl, Configuration=variant);
     set_param(mdl, 'StopTime', num2str(Tend));
+    set_param([mdl '/From File'], 'FileName', filename);
     
     if hidden
         set_param(mdl, 'SimulationCommand', 'Update');
