@@ -80,7 +80,12 @@ bool argusCameraDriver::setFramerate(const uint64_t _fps)
     {
         m_fps = _fps;
     }
-    
+    else
+    {
+        yCError(ARGUS_CAMERA) << "The required frame rate" << m_fps << "cannot be set";
+        return false;
+    }
+
     return ret;
 }
 
