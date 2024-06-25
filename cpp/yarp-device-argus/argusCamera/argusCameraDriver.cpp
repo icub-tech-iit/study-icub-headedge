@@ -692,8 +692,6 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         auto width = image2d->getSize()[0];
         auto height = image2d->getSize()[1];
 
-        // image.resize(m_width, m_height); to be tested
-
         NV::IImageNativeBuffer *iNativeBuffer = interface_cast<NV::IImageNativeBuffer>(img);
         if (!iNativeBuffer)
         {
