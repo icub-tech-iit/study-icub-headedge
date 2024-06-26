@@ -41,15 +41,18 @@ static const std::vector<cameraFeature_id_t> supported_features{YARP_FEATURE_EXP
 
 static const std::vector<cameraFeature_id_t> features_with_auto{YARP_FEATURE_EXPOSURE, YARP_FEATURE_WHITE_BALANCE};
 
-// Values taken from the balser documentation for IMX415-C FIXME! TO BE CHECKED!
-static const std::map<cameraFeature_id_t, std::pair<double, double>> featureMinMax{{YARP_FEATURE_EXPOSURE, {-2.0, 2.0}}, //fixed default 1
-                                                                                   {YARP_FEATURE_SATURATION, {0.0, 2.0}}, //fixed default 1
-                                                                                   {YARP_FEATURE_SHARPNESS, {-1.0, 1.0}}, //FIXED default -1
-                                                                                   {YARP_FEATURE_WHITE_BALANCE, {1.0, 8.0}},  //fixed // not sure about it, the doc is not clear, found empirically
-                                                                                   {YARP_FEATURE_GAIN, {1.0, 3981.07}}}; //fixed
+static const std::map<cameraFeature_id_t, std::pair<double, double>> featureMinMax{{YARP_FEATURE_EXPOSURE, {-2.0, 2.0}}, 
+                                                                                   {YARP_FEATURE_SATURATION, {0.0, 2.0}}, 
+                                                                                   {YARP_FEATURE_SHARPNESS, {-1.0, 1.0}}, 
+                                                                                   {YARP_FEATURE_WHITE_BALANCE, {1.0, 8.0}}, // not sure about it, the doc is not clear, found empirically
+                                                                                   {YARP_FEATURE_GAIN, {1.0, 3981.07}}}; 
 
 static const std::map<double, NV::Rotation> rotationToNVRot{{0.0, NV::ROTATION_0}, {90.0, NV::ROTATION_90}, {-90.0, NV::ROTATION_270}, {180.0, NV::ROTATION_180}};
 static const std::map<double, double> rotationToCVRot{{0.0, 0.0}, {90.0, cv::ROTATE_90_COUNTERCLOCKWISE}, {-90.0, cv::ROTATE_90_CLOCKWISE}, {180.0, cv::ROTATE_180}};
+
+static const std::map<std::string, std::vector<Argus::Size2D<uint32_t>>> cameraResolutions{
+    {"imx415", {Size2D<uint32_t>(1280, 720), Size2D<uint32_t>(1920, 1080), Size2D<uint32_t>(3840, 2160)}}
+};
 
 // We usually set the features through a range between 0 an 1, we have to translate it in meaninful value for the camera
 double fromZeroOneToRange(cameraFeature_id_t feature, double value)
@@ -158,13 +161,6 @@ bool argusCameraDriver::open(Searchable& config)
         yCError(ARGUS_CAMERA) << "Failed to get ICameraProperties interface";
         return false;
     }
-
-    iCameraProperties->getAllSensorModes(&m_sensorModes);
-    if (m_sensorModes.size() == 0)
-    {
-        yCError(ARGUS_CAMERA) << "Failed to get sensor modes";
-        return false;
-    }
     
     if (m_d >= m_cameraDevices.size())
     {
@@ -193,27 +189,27 @@ bool argusCameraDriver::open(Searchable& config)
     int nearestHeight = -1;
     double minDistance = std::numeric_limits<double>::max();
 
-    for (int sensorMode = 0; sensorMode < m_sensorModes.size(); sensorMode++) //FIXME for IMX415 1296x720 is zoomed-in
+    auto supportedResolutions = cameraResolutions.at(iCameraProperties->getModelName());
+    for (auto &resolution : supportedResolutions) 
     {
-        m_iSensorMode = interface_cast<ISensorMode>(m_sensorModes[sensorMode]);
-        if (m_iSensorMode->getResolution().width() == m_width && m_iSensorMode->getResolution().height() == m_height)
-        {
-            yCDebug(ARGUS_CAMERA) << "The required resolution" << m_iSensorMode->getResolution().width() << "x" << m_iSensorMode->getResolution().height() << "is available";
-            nearestWidth = m_width;
-            nearestHeight = m_height;
-            break;
-        }
-        else
-        {
-            yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Searching for the nearest resolution...";
-            double distance = std::abs(int(m_iSensorMode->getResolution().width() - m_width)) + std::abs(int(m_iSensorMode->getResolution().height() - m_height));
-            if (distance < minDistance)
+        if (resolution.width() == m_width && resolution.height() == m_height)
             {
-                minDistance = distance;
-                nearestWidth = m_iSensorMode->getResolution().width();
-                nearestHeight = m_iSensorMode->getResolution().height();
+                yCDebug(ARGUS_CAMERA) << "The resolution" << resolution.width() << "x" << resolution.height() << "is available";
+                nearestWidth = m_width;
+                nearestHeight = m_height;
+                break;
             }
-        }
+            else
+            {
+                yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Searching for the nearest resolution...";
+                double distance = std::abs(int(resolution.width() - m_width)) + std::abs(int(resolution.height() - m_height));
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    nearestWidth = resolution.width();
+                    nearestHeight = resolution.height();
+                }
+            }
     }
 
     if (nearestWidth != -1 && nearestHeight != -1)
