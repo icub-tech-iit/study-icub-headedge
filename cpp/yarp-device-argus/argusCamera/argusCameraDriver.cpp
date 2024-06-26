@@ -189,39 +189,27 @@ bool argusCameraDriver::open(Searchable& config)
     int nearestHeight = -1;
     double minDistance = std::numeric_limits<double>::max();
 
-    for (auto it = cameraResolutions.begin(); it != cameraResolutions.end(); it++) 
+    auto supportedResolutions = cameraResolutions.at(iCameraProperties->getModelName());
+    for (auto &resolution : supportedResolutions) 
     {
-        std::string modelName = it->first;
-        std::vector<Argus::Size2D<uint32_t>> resolutions = it->second;
-        if (modelName == iCameraProperties->getModelName())
-        {
-            for (int res = 0; res <= resolutions.size(); res++)
+        if (resolution.width() == m_width && resolution.height() == m_height)
             {
-                if (resolutions[res].width() == m_width && resolutions[res].height() == m_height)
+                yCDebug(ARGUS_CAMERA) << "The resolution" << resolution.width() << "x" << resolution.height() << "is available";
+                nearestWidth = m_width;
+                nearestHeight = m_height;
+                break;
+            }
+            else
+            {
+                yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Searching for the nearest resolution...";
+                double distance = std::abs(int(resolution.width() - m_width)) + std::abs(int(resolution.height() - m_height));
+                if (distance < minDistance)
                 {
-                    yCDebug(ARGUS_CAMERA) << "The resolution" << resolutions[res].width() << "x" << resolutions[res].height() << "for" << modelName << "camera is available";
-                    nearestWidth = m_width;
-                    nearestHeight = m_height;
-                    break;
-                }
-                else
-                {
-                    yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Searching for the nearest resolution...";
-                    double distance = std::abs(int(resolutions[res].width() - m_width)) + std::abs(int(resolutions[res].height() - m_height));
-                    if (distance < minDistance)
-                    {
-                        minDistance = distance;
-                        nearestWidth = resolutions[res].width();
-                        nearestHeight = resolutions[res].height();
-                    }
+                    minDistance = distance;
+                    nearestWidth = resolution.width();
+                    nearestHeight = resolution.height();
                 }
             }
-        }
-        else
-        {
-            yCError(ARGUS_CAMERA) << "No resolutions available for the provided camera model!";
-            return false;
-        }
     }
 
     if (nearestWidth != -1 && nearestHeight != -1)
