@@ -36,7 +36,6 @@
 #include <mutex>
 #include <typeinfo>
 
-
 namespace
 {
 YARP_LOG_COMPONENT(ARGUS_CAMERA, "yarp.device.argusCamera")
@@ -97,6 +96,10 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
 
     mutable std::mutex m_mutex;
     uint64_t m_fps{90};
+    cv::Mat rgba_img, bgr_img;
+#ifdef USE_CUDA
+    cv::cuda::GpuMat gpu_rgba_img, gpu_bgr_img, gpu_bgr_img_rot;
+#endif
 
     Argus::UniqueObj<Argus::CameraProvider> m_cameraProvider;
     Argus::UniqueObj<Argus::OutputStream> m_stream;

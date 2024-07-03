@@ -6,8 +6,6 @@
  * BSD-3-Clause license. See the accompanying LICENSE file for details.
  */
 
-// #include <opencv2/core/core_c.h>
-// #include <yarp/cv/Cv.h>
 #include <yarp/os/LogComponent.h>
 #include <yarp/os/Value.h>
 #include <yarp/sig/ImageUtils.h>
@@ -16,10 +14,9 @@
 #include <cmath>
 #include <cstdint>
 #include <iomanip>
-// #include <opencv2/opencv.hpp>
-// #include <opencv2/videoio.hpp>
-#if defined USE_CUDA
-// #include <opencv2/cudawarping.hpp>
+#ifdef USE_CUDA
+#include <opencv2/cudawarping.hpp>
+#include <opencv2/cudaimgproc.hpp>
 #endif  // USE_CUDA
 
 #include "argusCameraDriver.h"
@@ -254,6 +251,18 @@ bool argusCameraDriver::open(Searchable& config)
     }
 
     ok = ok && setFramerate(m_fps);
+
+    #ifdef USE_CUDA
+        yCDebug(ARGUS_CAMERA) << "Using CUDA!";
+        gpu_rgba_img = cv::cuda::GpuMat(m_width, m_height, CV_8UC4);
+        gpu_bgr_img = cv::cuda::GpuMat(m_width, m_height, CV_8UC3);
+        gpu_bgr_img_rot = cv::cuda::GpuMat(m_width, m_height, CV_8UC3);
+    #else
+        yCDebug(ARGUS_CAMERA) << "Not using CUDA!";
+    #endif
+
+    bgr_img = cv::Mat(m_height, m_width, CV_8UC3);
+    rgba_img = cv::Mat(m_height, m_width, CV_8UC4);
 
     return ok && startCamera();
 }
@@ -722,8 +731,25 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
             return false;
         }
 
-        cv::Mat rgba_img(height, width, CV_8UC4, nvBufSurface->surfaceList->mappedAddr.addr[0]);
-        cv::Mat bgr_img;
+        rgba_img = cv::Mat(height, width, CV_8UC4, nvBufSurface->surfaceList->mappedAddr.addr[0]);
+#ifdef USE_CUDA
+        gpu_rgba_img.upload(rgba_img);
+        cv::cuda::cvtColor(gpu_rgba_img, gpu_bgr_img, cv::COLOR_RGBA2BGR);
+
+        if (!m_rotation_with_crop && m_rotation != 0.0)
+        {
+            cv::Point2f img_center((gpu_bgr_img.cols - 1) / 2.0, (gpu_bgr_img.rows - 1) / 2.0);
+            cv::Mat M = cv::getRotationMatrix2D(img_center, m_rotation, 1.0);
+            cv::cuda::warpAffine(gpu_bgr_img, gpu_bgr_img_rot, M, gpu_bgr_img.size());
+        }
+        
+        if (m_width != width || m_height != height)
+        {
+            cv::Size size(m_width, m_height);
+            cv::cuda::resize(gpu_bgr_img_rot, gpu_bgr_img_rot, size);
+        }
+        gpu_bgr_img_rot.download(bgr_img);
+#else
         cv::cvtColor(rgba_img, bgr_img, cv::COLOR_RGBA2BGR);
 
         if (!m_rotation_with_crop && m_rotation != 0.0)
@@ -738,7 +764,7 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
             cv::Size size(m_width, m_height);
             cv::resize(bgr_img, bgr_img, size);
         }
-        
+#endif  // USE_CUDA
         image.copy(yarp::cv::fromCvMat<yarp::sig::PixelRgb>(bgr_img));
 
         if (NvBufSurfaceUnMap(nvBufSurface, 0, 0) != STATUS_OK) 

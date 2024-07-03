@@ -10,11 +10,8 @@ yarp_prepare_plugin(argusCamera
   INCLUDE argusCameraDriver.h
   EXTRA_CONFIG WRAPPER=frameGrabber_nws_yarp
   GENERATE_PARSER
-  # DEPENDS "pylon_FOUND" FIXME depends argus FOUND
   DEFAULT ON
 )
-
-# FIXME: param parser genrator?
 
 if(ENABLE_argusCamera)
   option(ALLOW_DEVICE_PARAM_PARSER_GENERATION "Generate the param parser for argusCamera device" OFF)
@@ -50,8 +47,6 @@ if(ENABLE_argusCamera)
     PRIVATE
       ${ARGUS_LIBRARIES}
       ${OPENCV_DEPS}
-    # FIXME argus libs
-    # FIXME opencv libs
   )
 
   yarp_install(
