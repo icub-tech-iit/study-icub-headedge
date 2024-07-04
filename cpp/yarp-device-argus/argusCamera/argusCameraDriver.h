@@ -98,7 +98,7 @@ class argusCameraDriver : public yarp::dev::DeviceDriver,
     uint64_t m_fps{90};
     cv::Mat rgba_img, bgr_img;
 #ifdef USE_CUDA
-    cv::cuda::GpuMat gpu_rgba_img, gpu_bgr_img, gpu_bgr_img_rot;
+    cv::cuda::GpuMat gpu_rgba_img, gpu_bgr_img;
 #endif
 
     Argus::UniqueObj<Argus::CameraProvider> m_cameraProvider;

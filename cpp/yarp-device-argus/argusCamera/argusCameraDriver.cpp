@@ -256,7 +256,6 @@ bool argusCameraDriver::open(Searchable& config)
         yCDebug(ARGUS_CAMERA) << "Using CUDA!";
         gpu_rgba_img = cv::cuda::GpuMat(m_width, m_height, CV_8UC4);
         gpu_bgr_img = cv::cuda::GpuMat(m_width, m_height, CV_8UC3);
-        gpu_bgr_img_rot = cv::cuda::GpuMat(m_width, m_height, CV_8UC3);
     #else
         yCDebug(ARGUS_CAMERA) << "Not using CUDA!";
     #endif
@@ -740,15 +739,18 @@ bool argusCameraDriver::getImage(yarp::sig::ImageOf<yarp::sig::PixelRgb>& image)
         {
             cv::Point2f img_center((gpu_bgr_img.cols - 1) / 2.0, (gpu_bgr_img.rows - 1) / 2.0);
             cv::Mat M = cv::getRotationMatrix2D(img_center, m_rotation, 1.0);
-            cv::cuda::warpAffine(gpu_bgr_img, gpu_bgr_img_rot, M, gpu_bgr_img.size());
+            // Workaround since with cv::cuda::warpAffine, source and dest images CANNOT be the same (otherwise will result in black frames)
+            cv::cuda::GpuMat tmp;
+            cv::cuda::warpAffine(gpu_bgr_img, tmp, M, gpu_bgr_img.size());
+            gpu_bgr_img = std::move(tmp);
         }
         
         if (m_width != width || m_height != height)
         {
             cv::Size size(m_width, m_height);
-            cv::cuda::resize(gpu_bgr_img_rot, gpu_bgr_img_rot, size);
+            cv::cuda::resize(gpu_bgr_img, gpu_bgr_img, size);
         }
-        gpu_bgr_img_rot.download(bgr_img);
+        gpu_bgr_img.download(bgr_img);
 #else
         cv::cvtColor(rgba_img, bgr_img, cv::COLOR_RGBA2BGR);
 
