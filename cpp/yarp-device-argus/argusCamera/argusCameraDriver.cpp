@@ -105,17 +105,29 @@ bool parseUint32Param(std::string param_name, std::uint32_t& param, yarp::os::Se
 
 bool argusCameraDriver::startCamera()
 {
+    setFramerate(m_fps);
     ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
-    iCaptureSession->repeat(m_request.get());
-
+    if (m_consumer)
+    {
+        if (!iCaptureSession->isRepeating())
+        {
+            iCaptureSession->repeat(m_request.get());
+        }
+    }
     return true;
 }
 
 bool argusCameraDriver::stopCamera()
 {
     ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
-    iCaptureSession->stopRepeat();
-
+    if (m_consumer)
+    {
+        if (iCaptureSession->isRepeating())
+        {
+            iCaptureSession->stopRepeat();
+            iCaptureSession->waitForIdle();
+        }
+    }
     return true;
 }
 
@@ -182,75 +194,7 @@ bool argusCameraDriver::open(Searchable& config)
         return false;
     }
 
-    int nearestWidth = -1;
-    int nearestHeight = -1;
-    double minDistance = std::numeric_limits<double>::max();
-
-    auto supportedResolutions = cameraResolutions.at(iCameraProperties->getModelName());
-    for (auto &resolution : supportedResolutions) 
-    {
-        if (resolution.width() == m_width && resolution.height() == m_height)
-            {
-                yCDebug(ARGUS_CAMERA) << "The resolution" << resolution.width() << "x" << resolution.height() << "is available";
-                nearestWidth = m_width;
-                nearestHeight = m_height;
-                break;
-            }
-            else
-            {
-                yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Searching for the nearest resolution...";
-                double distance = std::abs(int(resolution.width() - m_width)) + std::abs(int(resolution.height() - m_height));
-                if (distance < minDistance)
-                {
-                    minDistance = distance;
-                    nearestWidth = resolution.width();
-                    nearestHeight = resolution.height();
-                }
-            }
-    }
-
-    if (nearestWidth != -1 && nearestHeight != -1)
-    {
-        yCInfo(ARGUS_CAMERA) << "Nearest resolution found:" << nearestWidth << "x" << nearestHeight;
-    }
-
-    if (m_rotation_with_crop) 
-    {
-        if (m_rotation == -90.0 || m_rotation == 90.0)
-        {
-            std::swap(m_width, m_height);
-        }
-    }
-
-    Size2D<uint32_t> resolution{nearestWidth, nearestHeight};
-    iEglStreamSettings->setPixelFormat(PIXEL_FMT_YCbCr_420_888);
-    iEglStreamSettings->setResolution(resolution);
-
-    m_stream.reset(iCaptureSession->createOutputStream(m_streamSettings.get()));
-    m_consumer.reset(FrameConsumer::create(m_stream.get()));
-
-    if (!m_consumer)
-    {
-        yCError(ARGUS_CAMERA) << "Failed to create FrameConsumer";
-        return false;
-    }
-
-    m_request.reset(iCaptureSession->createRequest(Argus::CAPTURE_INTENT_PREVIEW));
-    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
-    if (iRequest->enableOutputStream(m_stream.get()) != STATUS_OK)
-    {
-        yCError(ARGUS_CAMERA) << "Failed to enable output stream";
-        return false;
-    }
-
-    ISourceSettings *m_iSourceSettings = interface_cast<ISourceSettings>(iRequest->getSourceSettings());
-    if (!m_iSourceSettings)
-    {
-        yCError(ARGUS_CAMERA) << "Failed to get ISourceSettings interface";
-        return false;
-    }
-
-    ok = ok && setFramerate(m_fps);
+    ok = ok && setRgbResolution(m_width, m_height);
 
     #ifdef USE_CUDA
         yCDebug(ARGUS_CAMERA) << "Using CUDA!";
@@ -296,16 +240,87 @@ bool argusCameraDriver::getRgbResolution(int& width, int& height)
 
 bool argusCameraDriver::setRgbResolution(int width, int height)
 {
-    IEGLOutputStreamSettings *iEglStreamSettings = interface_cast<IEGLOutputStreamSettings>(m_streamSettings);
     stopCamera();
+
+    IEGLOutputStreamSettings *iEglStreamSettings = interface_cast<IEGLOutputStreamSettings>(m_streamSettings);
+    ICameraProperties *iCameraProperties = interface_cast<ICameraProperties>(m_cameraDevices[m_d]);
+    ICaptureSession *iCaptureSession = interface_cast<ICaptureSession>(m_captureSession);
+    if (!iCaptureSession)
+    {
+        yCError(ARGUS_CAMERA) << "Failed to get ICaptureSession interface";
+        return false;
+    }
+
     if (width > 0 && height > 0)
     {
-        if(iEglStreamSettings->setResolution(Size2D<uint32_t>(width, height)) == STATUS_OK)
+        int nearestWidth = -1;
+        int nearestHeight = -1;
+        double minDistance = std::numeric_limits<double>::max();
+
+        auto supportedResolutions = cameraResolutions.at(iCameraProperties->getModelName());
+        for (auto &resolution : supportedResolutions)
+        {
+            if (resolution.width() == width && resolution.height() == height)
+                {
+                    yCDebug(ARGUS_CAMERA) << "The resolution" << resolution.width() << "x" << resolution.height() << "is available";
+                    nearestWidth = width;
+                    nearestHeight = height;
+                    break;
+                }
+                else
+                {
+                    yCWarning(ARGUS_CAMERA) << "The set width and height are different from the available ones. Searching for the nearest resolution...";
+                    double distance = std::abs(int(resolution.width() - width)) + std::abs(int(resolution.height() - height));
+                    if (distance < minDistance)
+                    {
+                        minDistance = distance;
+                        nearestWidth = resolution.width();
+                        nearestHeight = resolution.height();
+                    }
+                }
+        }
+
+        if (nearestWidth != -1 && nearestHeight != -1)
+        {
+            yCInfo(ARGUS_CAMERA) << "Nearest resolution found:" << nearestWidth << "x" << nearestHeight;
+        }
+
+        if (m_rotation_with_crop)
+        {
+            if (m_rotation == -90.0 || m_rotation == 90.0)
+            {
+                std::swap(m_width, m_height);
+            }
+        }
+
+        Size2D<uint32_t> resolution{nearestWidth, nearestHeight};
+        iEglStreamSettings->setPixelFormat(PIXEL_FMT_YCbCr_420_888);
+        iEglStreamSettings->setResolution(resolution);
+
+        if(iEglStreamSettings->setResolution(Size2D<uint32_t>(resolution)) == STATUS_OK)
         {
             m_width = width;
             m_height = height;
         }
     }
+
+    m_stream.reset(iCaptureSession->createOutputStream(m_streamSettings.get()));
+    m_consumer.reset(FrameConsumer::create(m_stream.get()));
+
+    if (!m_consumer)
+    {
+        yCError(ARGUS_CAMERA) << "Failed to create FrameConsumer";
+        return false;
+    }
+
+    m_request.reset(iCaptureSession->createRequest(Argus::CAPTURE_INTENT_PREVIEW));
+    Argus::IRequest *iRequest = Argus::interface_cast<Argus::IRequest>(m_request);
+    if (iRequest->enableOutputStream(m_stream.get()) != STATUS_OK)
+    {
+        yCError(ARGUS_CAMERA) << "Failed to enable output stream";
+        return false;
+    }
+
     startCamera();
     return true;
 }
