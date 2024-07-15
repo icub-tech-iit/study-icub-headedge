@@ -289,7 +289,7 @@ bool argusCameraDriver::setRgbResolution(int width, int height)
         {
             if (m_rotation == -90.0 || m_rotation == 90.0)
             {
-                std::swap(m_width, m_height);
+                std::swap(width, height);
             }
         }
 
