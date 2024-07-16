@@ -27,6 +27,8 @@ function variantname = get_variantname_from_model(mdl)
         if vars(i).Name == "Selector_Payload"
             if vars(i).Value.Value == "ergoCubHead"
                 variantname = strcat(variantname, "ergoCub");
+            elseif vars(i).Value.Value == "ergoCubHeadWithEyes"
+                variantname = strcat(variantname, "ergoCubWithEyes");    
             else
                 variantname = strcat(variantname, "iCub");
             end
