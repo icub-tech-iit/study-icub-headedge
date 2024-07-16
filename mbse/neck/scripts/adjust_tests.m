@@ -15,6 +15,10 @@ function setVariantConf(tf, tsName, VariantConfName)
     ts = getTestSuiteByName(tf, tsName);
     tc = getTestCases(ts);
     for i = 1:length(tc)
-        setProperty(tc(i), "VariantConfiguration", VariantConfName);
+        confName = VariantConfName;
+        if contains(tc(i).Name, "Eyes", 'IgnoreCase', true)
+            confName = strcat(confName, "WithEyes");
+        end
+        setProperty(tc(i), "VariantConfiguration", confName);
     end
 end
