@@ -19,6 +19,9 @@ function setVariantConf(tf, tsName, VariantConfName)
         if contains(tc(i).Name, "Eyes", 'IgnoreCase', true)
             confName = strcat(confName, "WithEyes");
         end
+        if contains(tc(i).Name, "Disturbances", 'IgnoreCase', true)
+             confName = strcat(confName, "_Disturbances");
+        end
         setProperty(tc(i), "VariantConfiguration", confName);
     end
 end

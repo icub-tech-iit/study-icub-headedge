@@ -36,6 +36,14 @@ function variantname = get_variantname_from_model(mdl)
         end
     end
 
+    for i = 1:length(vars)
+        if vars(i).Name == "Selector_Disturbances"
+            if vars(i).Value.Value ~= "None"
+                variantname = strcat(variantname, "_Disturbances");
+            end
+        end
+    end
+
     if ~isLoaded
         close_system(mdl, 0);
     end

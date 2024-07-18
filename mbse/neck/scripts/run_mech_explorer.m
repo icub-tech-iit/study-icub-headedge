@@ -9,7 +9,7 @@ function run_mech_explorer(variant, varargin)
         S1 = S1(~[S1.isdir]);
         S2 = [];
         for i = 1:length(S1)
-            if contains(S1(i).name, 'voltage')
+            if contains(S1(i).name, 'data')
                 S2 = [S2; S1(i)];
             end
         end
@@ -26,8 +26,8 @@ function run_mech_explorer(variant, varargin)
         filename = varargin{2};
     end
     
-    data = load(filename);
-    Tend = data.voltage.Time(end);
+    d = load(filename);
+    Tend = d.data.Time(end);
     
     mdl = 'PlaybackMechExplorer';
     if hidden
@@ -35,7 +35,7 @@ function run_mech_explorer(variant, varargin)
     else
         open_system(mdl);
     end
-    
+   
     Simulink.VariantManager.activateModel(mdl, Configuration=variant);
     set_param(mdl, 'StopTime', num2str(Tend));
     set_param([mdl '/From File'], 'FileName', filename);
