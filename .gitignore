@@ -4,6 +4,7 @@
 !.gitignore
 !*.1
 !*.md
+!*.mlx
 !*.stl
 !*.step
 !*/
