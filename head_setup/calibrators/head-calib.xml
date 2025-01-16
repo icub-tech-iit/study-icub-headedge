@@ -7,34 +7,33 @@
         <xi:include href="../general.xml" />
         
         <group name="GENERAL">
-            <param name="joints"> 2 </param> <!-- the number of joints of the robot part -->
+            <param name="joints"> 4 </param> <!-- the number of joints of the robot part -->
             <param name="deviceName"> HeadV3_Calibrator </param> <!-- this name is used for high-level debug -->
         </group>
 
         <group name="HOME">
-            <param name="positionHome">     0           0      </param>
-            <param name="velocityHome">     10          10     </param>
+            <param name="positionHome">     0       0           0           0    </param>
+            <param name="velocityHome">     10      10          10          10   </param>
         </group>
 
-        <!-- joint logical number           0           1          -->
-        <!-- joint name                     eyes-tilt   eyes_pan   -->  <!-- j4 is right-eye, j5 is left-eye -->
+        <!-- joint logical number           0           1           2           3       -->
+        <!-- joint name                     eyelids     eyes_tilt   eyes_vers   eyes_verg   --> <!-- j1 is right-eye, j2 is left-eye -->
         <group name="CALIBRATION">
-        <param name="calibrationType">      12          5      </param>
-        <param name="calibration1">   	    26383	    3000   </param>
-        <param name="calibration2">         0           8192   </param>
-        <param name="calibration3">	        0           0      </param> 
-        <param name="calibration4">         0           0      </param>
-        <param name="calibration5">         0           0      </param>                
-        <param name="calibrationZero">      0           0      </param>
-        <param name="calibrationDelta">     0           0      </param> 
-      
-        <param name="startupPosition">      0           0      </param>        
-        <param name="startupVelocity">      10          20     </param>        
-        <param name="startupMaxPwm">        3000        0      </param>        
-        <param name="startupPosThreshold">  2           2      </param>        
+        <param name="calibrationType">      12          12          5           5                 </param>
+        <param name="calibration1">   	    -1888       63039	    3000        3000              </param>
+        <param name="calibration2">         0           0           8192        8192               </param>
+        <param name="calibration3">	        0           0           0           0                  </param> 
+        <param name="calibration4">         0           0           0           0                  </param>
+        <param name="calibration5">         0           0           0           0                  </param>                
+        <param name="calibrationZero">      0           0           0           0                  </param>
+        <param name="calibrationDelta">     0           0           0           0                  </param> 
+        <param name="startupPosition">      0           0           0           0                  </param>        
+        <param name="startupVelocity">      10          10          20          20                </param>        
+        <param name="startupMaxPwm">        3360        3000        0           0               </param>        
+        <param name="startupPosThreshold">  90          2           2           2                 </param>        
         </group> 
 
-        <param name="CALIB_ORDER"> (0) (1)</param> 
+        <param name="CALIB_ORDER"> (0) (1) (2 3) </param> 
 
         <action phase="startup" level="10" type="calibrate">
             <param name="target">head-eb1-j0_1-mc</param>
