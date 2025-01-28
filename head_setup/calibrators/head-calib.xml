@@ -20,7 +20,7 @@
         <!-- joint name                     eyelids     eyes_tilt   eyes_vers   eyes_verg   --> <!-- j1 is right-eye, j2 is left-eye -->
         <group name="CALIBRATION">
         <param name="calibrationType">      12          12          5           5                 </param>
-        <param name="calibration1">   	    -1888       63039	    3000        3000              </param>
+        <param name="calibration1">   	    -1888       63039	    1500        1500               </param>
         <param name="calibration2">         0           0           8192        8192               </param>
         <param name="calibration3">	        0           0           0           0                  </param> 
         <param name="calibration4">         0           0           0           0                  </param>
@@ -33,14 +33,14 @@
         <param name="startupPosThreshold">  90          2           2           2                 </param>        
         </group> 
 
-        <param name="CALIB_ORDER"> (0) (1) (2 3) </param> 
-
+        <!-- <param name="CALIB_ORDER"> (0) (1) (2 3) </param>  -->
+        <param name="CALIB_ORDER"> (1) (2 3) </param> 
         <action phase="startup" level="10" type="calibrate">
-            <param name="target">head-eb1-j0_3-mc</param>
+            <param name="target">head-mc_remapper</param>
         </action>
 
         <action phase="interrupt1" level="1" type="park">
-            <param name="target">head-eb1-j0_3-mc</param>
+            <param name="target">head-mc_remapper</param>
         </action>
 
         <action phase="interrupt3" level="1" type="abort" />
