@@ -11,14 +11,14 @@
     </group>
 
     <group name="HOME">
-        <param name="positionHome">                     0       0       0       </param>
+        <param name="positionHome">                     0       0       0      </param>
         <param name="velocityHome">                     10      10      10      </param>
     </group>
 
     <group name="CALIBRATION">
         <param name="calibrationType">                  12      12      12      </param>
 
-        <param name="calibration1">                     36389   14555   2539    </param>
+        <param name="calibration1">                     36539   14555   2539    </param>
         <param name="calibration2">                     0       0       0       </param>
         <param name="calibration3">                     0       0       0       </param>
         <param name="calibration4">                     0       0       0       </param>

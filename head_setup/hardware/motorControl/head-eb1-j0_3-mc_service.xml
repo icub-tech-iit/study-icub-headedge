@@ -21,9 +21,9 @@
                 </group>
                 
                 <group name="ENCODER1">  
-                    <param name="type">             none             aea             none            none        </param>  
+                    <param name="type">             none        aea             none            none        </param>  
                     <param name="port">             none        CONN:P10        CONN:none       CONN:none   </param>
-                    <param name="position">         none         atjoint         none            none        </param> 
+                    <param name="position">         none        atjoint         none            none        </param> 
                     <param name="resolution">       0           4096            0               0           </param>
                     <param name="tolerance">        0           0.703           0               0           </param>  
                 </group>        

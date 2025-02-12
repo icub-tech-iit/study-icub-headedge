@@ -73,32 +73,33 @@ int main(int argc, char* argv[]) {
             yarp::os::Time::delay(.1);
         }
     }
-    
-    for (int joint = 0; joint < 3; joint++) 
-    {
+
+    // for (int joint = 3; joint < 6; joint++) 
+    // {
+        int joint=5;
         iLim->getLimits(joint, &min, &max);
         range = max - min;
 
         bool doneU = false;
         bool doneL = false;
         // std::vector<double> velocities = {20.0, 40.0, 60.0, 80.0, 100.0};
-        double velocity = 20.0;
-        int cycles = 10;
+        double velocity = 100.0;
+        int cycles = 50;
 
         for (int i = 0; i < cycles; i++)
         {
-            yarp::os::Time::delay(2.);
+            yarp::os::Time::delay(.5);
 
             iPos->setRefSpeed(joint, velocity);
             iPos->setRefAcceleration(joint, std::numeric_limits<double>::max());
-            iPos->positionMove(joint, max - 0.1 *range);
+            iPos->positionMove(joint, max - 0.05 *range);
             while (!doneU) {
                 iPos->checkMotionDone(joint, &doneU);
                 yarp::os::Time::delay(.1);
             }
 
-            yarp::os::Time::delay(2.);
-            iPos->positionMove(joint, min + 0.1 * range);
+            yarp::os::Time::delay(.5);
+            iPos->positionMove(joint, min + 0.05 * range);
             while (!doneL) {
                 iPos->checkMotionDone(joint, &doneL);
                 yarp::os::Time::delay(.1);
@@ -106,7 +107,7 @@ int main(int argc, char* argv[]) {
         }
 
         iPos->positionMove(joint, 0.0);
-    }
+    //}
     
     yInfo() << "Done.";
     
