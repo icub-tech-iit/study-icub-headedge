@@ -1,0 +1,3 @@
+[submodule "simulink-arsenal"]
+	path = simulink-arsenal
+	url = https://github.com/icub-tech-iit/simulink-arsenal
