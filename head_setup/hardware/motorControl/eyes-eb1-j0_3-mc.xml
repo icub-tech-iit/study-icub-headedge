@@ -2,18 +2,18 @@
 <!DOCTYPE devices PUBLIC "-//YARP//DTD yarprobotinterface 3.0//EN" "http://www.yarp.it/DTD/yarprobotinterfaceV3.0.dtd">
 
 
-<device xmlns:xi="http://www.w3.org/2001/XInclude" name="head-eb1-j0_3-mc" type="embObjMotionControl">
+<device xmlns:xi="http://www.w3.org/2001/XInclude" name="eyes-eb1-j0_3-mc" type="embObjMotionControl">
 
     <xi:include href="../../general.xml" />
-    <xi:include href="../../hardware/electronics/head-eb1-j0_3-eln.xml" />
-    <xi:include href="../../hardware/mechanicals/head-eb1-j0_3-mec_separate_eyes.xml" />
-    <xi:include href="./head-eb1-j0_3-mc_service.xml" />
+    <xi:include href="../../hardware/electronics/eyes-eb1-j0_3-eln.xml" />
+    <xi:include href="../../hardware/mechanicals/eyes-eb1-j0_3-mec.xml" />
+    <xi:include href="./eyes-eb1-j0_3-mc_service.xml" />
 
     <!-- joint number                           0               1                  2                3           -->
     <!-- joint name                             eyelids         eyes-tilt          eyes-vers        eyes-verg   -->         <!-- j2 is right-eye, j3 is left-eye -->
     <group name="LIMITS">
-        <param name="jntPosMin">                -5              -30                 -30             -30             </param>
-        <param name="jntPosMax">                +65             +30                 +30             +30           </param>
+        <param name="jntPosMin">                -5              -30                 -30             0             </param>
+        <param name="jntPosMax">                +65             +30                 +30             +45           </param>
         <param name="jntVelMax">                2000            1000                1000            1000          </param>
         <param name="motorOverloadCurrents">    700             2000                2500            2500          </param>
         <param name="motorNominalCurrents">     1000            700                 700             700           </param>
@@ -63,14 +63,15 @@
     <!-- default position PID: end -->
 
 
-    <!-- other default PIDs: Sbegin -->   
+    <!-- other default PIDs: begin -->   
     <!-- other default PIDs: end -->
 
 
     <!-- custom PIDs: begin -->    
     <!-- custom PIDs: end -->
-    <!-- <group name="OTHER_CONTROL_PARAMETERS">
-        <param name="deadZone">               0.0495      0.0495         0.0990     0.0990         </param>  
-    </group> -->
+
+    <group name="OTHER_CONTROL_PARAMETERS">
+        <param name="deadZone">             0.0495      0.0495              0.0990     0.0990         </param>  
+    </group>
     
 </device>

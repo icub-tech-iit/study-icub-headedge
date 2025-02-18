@@ -13,7 +13,7 @@
         <param name="logIAmplifierControl">true</param>
         <param name="logIRawValuesPublisher">false</param>
         <param name="saveBufferManagerConfiguration">true</param>
-        <param name="experimentName">test_eyes_uncoupled</param>
+        <param name="experimentName">test_eyes_decoupled</param>
         <param name="path">/usr/local/src/robot/study-icub-headedge/data/</param>
         <param name="n_samples">100000000</param>
         <param name="save_periodically">false</param>
@@ -25,7 +25,7 @@
         <action phase="startup" level="15" type="attach">
             <paramlist name="networks">
                 <!-- motorcontrol and virtual torque sensors -->
-                <elem name="head-j0">head-eb1-j0_3-mc</elem>
+                <elem name="eyes-j0">eyes-eb1-j0_3-mc</elem>
                 <!-- ft -->
             </paramlist>
         </action>
