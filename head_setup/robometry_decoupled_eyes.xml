@@ -3,7 +3,7 @@
 
 
     <device xmlns:xi="http://www.w3.org/2001/XInclude" name="telemetryDeviceDumper" type="telemetryDeviceDumper">
-        <param name="axesNames">(eyes_tilt, eyes_left, eyes_right)</param>
+        <param name="axesNames">(eyes_tilt, eyes_right, eyes_left)</param>
         <param name="logIEncoders">true</param>
         <param name="logITorqueControl">true</param>
         <param name="logIMotorEncoders">true</param>
