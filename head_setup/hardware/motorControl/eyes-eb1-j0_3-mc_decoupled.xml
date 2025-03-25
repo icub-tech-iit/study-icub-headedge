@@ -6,7 +6,7 @@
 
     <xi:include href="../../general.xml" />
     <xi:include href="../../hardware/electronics/eyes-eb1-j0_3-eln.xml" />
-    <xi:include href="../../hardware/mechanicals/eyes-eb1-j0_3-mec_separate_eyes.xml" />
+    <xi:include href="../../hardware/mechanicals/eyes-eb1-j0_3-mec_decoupled.xml" />
     <xi:include href="./eyes-eb1-j0_3-mc_service.xml" />
 
     <!-- joint number                           0               1                  2                3           -->
@@ -69,8 +69,8 @@
 
     <!-- custom PIDs: begin -->    
     <!-- custom PIDs: end -->
-    <!-- <group name="OTHER_CONTROL_PARAMETERS">
+    <group name="OTHER_CONTROL_PARAMETERS">
         <param name="deadZone">               0.0495      0.0495         0.0990     0.0990         </param>  
-    </group> -->
+    </group>
     
 </device>
